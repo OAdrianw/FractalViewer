@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Mandelbrot\**" />
+    <EmbeddedResource Remove="Mandelbrot\**" />
+    <None Remove="Mandelbrot\**" />
+  </ItemGroup>
+
+
+	<ItemGroup>
+	  <PackageReference Include="OpenTK.GLControl" Version="4.0.2" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+	  <ProjectReference Include="Mandelbrot\Mandelbrot.csproj" />
+	</ItemGroup>
+
+
+</Project>
