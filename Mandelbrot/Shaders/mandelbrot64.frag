@@ -1,15 +1,18 @@
-﻿#version 330 core
+﻿#version 460 core
 
 in vec3 vPos; 
 out vec4 FragColor;
 
-uniform float minx;
-uniform float maxx;
-uniform float miny;
-uniform float maxy;
+uniform double minx;
+uniform double maxx;
+uniform double miny;
+uniform double maxy;
 
 uniform float MAX_ITERATIONS;
 uniform float N_POWER;
+
+uniform vec3 palette[10];
+uniform int palette_size;
 
 uniform vec2 beginRect;     
 uniform vec2 endRect;       
@@ -18,11 +21,11 @@ uniform float u_borderWidth;
 
 
 
-float iterateMandelbrot(vec2 coord) {
-    vec2 z = coord;
-    vec2 c = coord;
+float iterateMandelbrot(dvec2 coord) {
+    dvec2 z = dvec2(0.0);
+    dvec2 c = coord;
     
-    float tempZ = z.x;
+    double tempZ = z.x;
     float count = 0.0;
 
     do {
@@ -73,40 +76,39 @@ vec4 drawSelection() {
 vec4 colorFractal(float count) {
     if (count == MAX_ITERATIONS) {
         return vec4(0.0, 0.0, 0.0, 1.0); // Inside the Mandelbrot 
-    }else {
+    } else {
+        // Map the count to palette space
 
-        float normalizedValue = count / MAX_ITERATIONS;
-
-        // Color palette
-        vec4 color1 = vec4(0.9, 0.9, 0.9, 1.0); // Dark blue
-        vec4 color2 = vec4(0.0, 0.5, 1.0, 1.0); // Bright blue
-        vec4 color3 = vec4(0.9, 0.9, 0.2, 1.0); // Yellow
-        vec4 color4 = vec4(0.0, 0.2, 0.1, 1.0); // Red
-        vec4 color5 = vec4(3.0, 0.5, 0.3, 1.0); // Dark Red
-
-
-        // Interpolate between colors 
-        if (normalizedValue < 0.25) {
-            return mix(color1, color2, normalizedValue * 4.0);
-        } else if (normalizedValue < 0.5) {
-            return mix(color2, color3, (normalizedValue - 0.25) * 4.0);
-        } else if (normalizedValue < 0.75) {
-            return mix(color3, color4, (normalizedValue - 0.5) * 4.0);
-        } else {
-            return mix(color4, color5, (normalizedValue - 0.75) * 4.0);
+        if (palette_size <= 0) {
+            return vec4(1.0, 0.0, 1.0, 1.0); // Magenta = error indicator
         }
-    } 
+
+        float palettePos = count * float(palette_size - 1) / MAX_ITERATIONS;
+        
+        // Get the two adjacent palette indices (with wrapping)
+        int idx1 = int(floor(palettePos)) % palette_size;
+        int idx2 = (idx1 + 1) % palette_size;
+        
+        // Get the fractional part for smooth interpolation
+        float t = fract(palettePos);
+        
+        vec3 color1 = palette[idx1];
+        vec3 color2 = palette[idx2];
+        vec3 color = mix(color1, color2, t);
+
+        return vec4(color, 1.0);
+    }
 }
 
 void main(){
 
-    float x_interp = (vPos.x + 1.0) / 2.0; 
-    float y_interp = (vPos.y + 1.0) / 2.0; 
+    double x_interp = (vPos.x + 1.0) / 2.0; 
+    double y_interp = (vPos.y + 1.0) / 2.0; 
 
-    float x_coord  = mix(minx, maxx, x_interp);
-    float y_coord  = mix(miny, maxy, y_interp);
+    double x_coord  = mix(minx, maxx, x_interp);
+    double y_coord  = mix(miny, maxy, y_interp);
 
-    vec2 coord = vec2(x_coord, y_coord);
+    dvec2 coord = dvec2(x_coord, y_coord);
 
     float i = iterateMandelbrot(coord);
     vec4 color;
