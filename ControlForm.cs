@@ -30,7 +30,6 @@ namespace Mandelbrot
         private Label zValueLabel;
         private RadioButton btnGPU32;
         private RadioButton btnGPU64;
-        //private Label _SideLength;
 
         public ControlForm(Program game)
         {
@@ -42,7 +41,7 @@ namespace Mandelbrot
 
             _fractalWindow.OnPerformanceMetricsUpdated += UpdatePerformanceLabels;
             _fractalWindow.OnZoomUpdated += OnZoomUpdated;
-            _fractalWindow.OnCenterUpdated += OnCenterUpdated;
+            _fractalWindow.OnCenterUpdated += OnCenterUpdate;
 
             InitializeComponent();
 
@@ -94,7 +93,7 @@ namespace Mandelbrot
 
         }
 
-        private void OnCenterUpdated(Vector3d value)
+        private void OnCenterUpdate(Vector3d value)
         {
             if (this.IsDisposed || !this.IsHandleCreated)
             {
@@ -182,7 +181,7 @@ namespace Mandelbrot
         {
             _fractalWindow.OnPerformanceMetricsUpdated -= UpdatePerformanceLabels;
             _fractalWindow.OnZoomUpdated -= OnZoomUpdated;
-            _fractalWindow.OnCenterUpdated -= OnCenterUpdated;
+            _fractalWindow.OnCenterUpdated -= OnCenterUpdate;
             _fractalWindow.Close();
             base.OnFormClosing(e);
         }

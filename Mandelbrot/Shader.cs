@@ -52,6 +52,11 @@ namespace Mandelbrot
             GL.UseProgram(Handle);
         }
 
+        public void Dispose()
+        {
+            GL.DeleteProgram(Handle);
+        }
+
         private void CheckCompileErrors(int shader, string type)
         {
             int success;
@@ -132,5 +137,20 @@ namespace Mandelbrot
             GL.Uniform4(location, value);
         }
 
+        public void SetArray3(string name, int length, Vector3[] array)
+        {
+            int location = GL.GetUniformLocation(Handle, $"{name}[0]");
+            if (location == -1) return;
+
+            float[] floatArray = new float[array.Length * 3];
+            for (int i = 0; i < array.Length; i++)
+            {
+                floatArray[i * 3] = array[i].X;
+                floatArray[i * 3 + 1] = array[i].Y;
+                floatArray[i * 3 + 2] = array[i].Z;
+            }
+
+            GL.Uniform3(location, length, floatArray);
+        }
     }
 }
