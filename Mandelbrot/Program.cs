@@ -20,7 +20,10 @@ namespace Mandelbrot
     {
         private InputHandler _inputHandler;
         private Renderer _renderer;
- 
+        private ConcurrentQueue<string> _shaderCommandQueue = new ConcurrentQueue<string>();
+
+
+
         private double _timeSinceLastFpsUpdate = 0.0;
         private int _frameCount = 0;
         private int _currentFps = 0;
@@ -39,6 +42,7 @@ namespace Mandelbrot
 
         int canvasWidth = 640, canvasHeight = 480;
         public string renderType = "GPU32";
+        private string previousRenderType = "GPU32";
 
 
         public int StartX { get; set; } = 0;
@@ -67,6 +71,9 @@ namespace Mandelbrot
         public Vector2i target_Size;
 
         public bool isSelectingRectangle;
+        private bool lockPosX = false;
+        private bool lockPosY = false;
+
         public bool allowDebugging = false;
 
 
@@ -108,6 +115,7 @@ namespace Mandelbrot
             canvasHeight = nativeWindowSettings.ClientSize.Y;
 
             nativeWindowSettings.Location = new Vector2i(StartX, StartY);
+            _shaderCommandQueue.Enqueue("GPU32");
         }
 
 
@@ -137,6 +145,19 @@ namespace Mandelbrot
 
         public void changeRenderer(string newRendererType)
         {
+            _shaderCommandQueue.Enqueue(newRendererType);
+        }
+
+        public void LockCenterPos(char axis, bool lockState)
+        {
+            if (axis == 'x')
+            {
+                lockPosX = lockState;
+            }
+            else if (axis == 'y')
+            {
+                lockPosY = lockState;
+            }
         }
 
         protected override void OnLoad()
@@ -152,8 +173,8 @@ namespace Mandelbrot
             if (renderType == "GPU32")
             {
 
-                float dx = -(pixelDelta.X / Size.X) * initialSideLength;
-                float dy = (pixelDelta.Y / Size.Y) * initialSideLength;
+                float dx = (lockPosX) ? 0 : -(pixelDelta.X / Size.X) * initialSideLength;
+                float dy = (lockPosY) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLength;
 
                 target_Center.X += dx;
                 target_Center.Y += dy;
@@ -162,8 +183,8 @@ namespace Mandelbrot
             else if (renderType == "GPU64")
             {
 
-                double dx = -(pixelDelta.X / Size.X) * initialSideLengthPD;
-                double dy = (pixelDelta.Y / Size.Y) * initialSideLengthPD;
+                double dx = (lockPosX) ? 0 : -(pixelDelta.X / Size.X) * initialSideLengthPD;
+                double dy = (lockPosY) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLengthPD;
 
                 target_CenterPD.X += dx;
                 target_CenterPD.Y += dy;
@@ -211,8 +232,8 @@ namespace Mandelbrot
                 float newMouseWorldY = newMaxY - mouseNormY * (newMaxY - newMinY);
 
 
-                target_Center.X += mouseWorldX - newMouseWorldX;
-                target_Center.Y += mouseWorldY - newMouseWorldY;
+                target_Center.X += (lockPosX) ? 0 : mouseWorldX - newMouseWorldX;
+                target_Center.Y += (lockPosY) ? 0 : mouseWorldY - newMouseWorldY;
 
             }
 
@@ -244,8 +265,8 @@ namespace Mandelbrot
                 double newMouseWorldX = newMinX + mouseNormX * (newMaxX - newMinX);
                 double newMouseWorldY = newMaxY - mouseNormY * (newMaxY - newMinY);
 
-                target_CenterPD.X += mouseWorldX - newMouseWorldX;
-                target_CenterPD.Y += mouseWorldY - newMouseWorldY;
+                target_CenterPD.X += (lockPosX) ? 0 : mouseWorldX - newMouseWorldX;
+                target_CenterPD.Y += (lockPosY) ? 0 : mouseWorldY - newMouseWorldY;
             }
 
         }
@@ -303,11 +324,43 @@ namespace Mandelbrot
 
             }
 
+
+            while (_shaderCommandQueue.TryDequeue(out string command))
+            {
+                if (command == "GPU32" && previousRenderType == "GPU64")
+                {
+                    currentCenter = new Vector2((float)currentCenterPD.X, (float)currentCenterPD.Y);
+                    initialSideLength = (float)initialSideLengthPD;
+                    target_Center = currentCenter;
+                    target_SideLength = initialSideLength;
+                }
+                else if (command == "GPU64" && previousRenderType == "GPU32")
+                {
+                    currentCenterPD = new Vector2d(currentCenter.X, currentCenter.Y);
+                    initialSideLengthPD = initialSideLength;
+                    target_CenterPD = currentCenterPD;
+                    target_SideLengthPD = initialSideLengthPD;
+                }
+
+                renderType = command;
+                _renderer.SetRenderType(command, this.Context, Size);
+                _renderer.NPower = NPower;
+                _renderer._isSelectingRectangle = isSelectingRectangle;
+                _renderer.selectBegin = rectanglePosBegin;
+                _renderer.selectEnd = rectanglePosEnd;
+
+                Console.WriteLine($"Switched to {renderType} renderer.");
+                Console.WriteLine($"Previous renderer: {previousRenderType}");
+                previousRenderType = renderType;
+            }
+
+            _renderer.MIterations = MIterations;
             if (renderType == "GPU32")
             {
                 _renderer.Center = currentCenter;
                 _renderer.SideLength = initialSideLength;
-            }else if (renderType == "GPU64")
+            }
+            else if (renderType == "GPU64")
             {
                 _renderer.CenterPD = currentCenterPD;
                 _renderer.SideLengthPD = initialSideLengthPD;
@@ -328,7 +381,6 @@ namespace Mandelbrot
             float deltaTime = (float)args.Time;
             float dT1 = deltaTime * 10f;
             float dT2 = deltaTime * 3.5f;
-
 
             if (renderType == "GPU32")
             {
