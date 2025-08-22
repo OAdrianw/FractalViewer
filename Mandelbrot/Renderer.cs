@@ -56,6 +56,30 @@ namespace Mandelbrot
             renderType = type;
         }
 
+        public void SetRenderType(string type, IGLFWGraphicsContext context, Vector2i Size)
+        {
+            context.MakeCurrent(); 
+            renderType = type;
+            _activeShader = renderType == "GPU32" ? _shader32 : _shader64;
+            try
+            {
+                _activeShader.Use();
+
+                calcCoordinates();          
+                _activeShader.SetFloat("N_POWER", NPower);
+                _activeShader.SetFloat("MAX_ITERATIONS", MIterations);
+                colorFractal();             
+                checkSelection(Size);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to switch shader: {ex.Message}");
+                throw;
+            }
+        }
+
+
+
         public void OnLoad()
         {
 
@@ -90,8 +114,6 @@ namespace Mandelbrot
             _activeShader.Use();
 
         }
-
-
 
         public void Render(Vector2 Size) {
 

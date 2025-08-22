@@ -21,7 +21,7 @@ uniform float u_borderWidth;
 
 
 
-float iterateMandelbrot(vec2 coord) {
+float iterateMandelbrot_naive(vec2 coord) {
     vec2 z = vec2(0.0);
     vec2 c = coord;
     
@@ -38,6 +38,26 @@ float iterateMandelbrot(vec2 coord) {
 
     return count;
 }
+
+float iterateMandelbrot_optimized(vec2 p0) {
+    vec2 p = vec2(0.0);
+    vec2 p2 = vec2(0.0);
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + p0.y;
+        p.x = p2.x - p2.y + p0.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+
 
 vec4 drawSelection() {
 
@@ -110,7 +130,7 @@ void main(){
 
     vec2 coord = vec2(x_coord, y_coord);
 
-    float i = iterateMandelbrot(coord);
+    float i = iterateMandelbrot_optimized(coord);
     vec4 color;
 
     color = colorFractal(i);

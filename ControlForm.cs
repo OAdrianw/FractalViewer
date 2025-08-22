@@ -29,7 +29,13 @@ namespace Mandelbrot
         private TextBox zInput;
         private Label zValueLabel;
         private RadioButton btnGPU32;
+        private Button btnLockPosX;
+        private Button btnLockPosY;
+        private Button btnLockPosZ;
         private RadioButton btnGPU64;
+
+        private Image lockIMG;
+        private Image unlockIMG;
 
         public ControlForm(Program game)
         {
@@ -58,6 +64,22 @@ namespace Mandelbrot
             yInput.GotFocus += (s, e) => { isEditingYPos = true; };
             yInput.KeyPress += (s, e) => { if (e.KeyChar == '\r') { e.Handled = true; _updateCenterPos('y', yInput, ref isEditingYPos); } };
             yInput.Leave += (s, e) => { isEditingYPos = false; };
+
+
+            lockIMG = Image.FromFile("Assets/lock.png");
+            unlockIMG = Image.FromFile("Assets/unlock.png");
+
+            btnLockPosX.BackgroundImage = unlockIMG;
+            btnLockPosX.MouseEnter += (s, e) => { btnLockPosX.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
+            btnLockPosX.MouseLeave += (s, e) => { btnLockPosX.FlatAppearance.MouseDownBackColor = Color.Transparent; };
+
+            btnLockPosY.BackgroundImage = unlockIMG;
+            btnLockPosY.MouseEnter += (s, e) => { btnLockPosY.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
+            btnLockPosY.MouseLeave += (s, e) => { btnLockPosY.FlatAppearance.MouseDownBackColor = Color.Transparent; };
+
+            btnLockPosZ.BackgroundImage = unlockIMG;
+            btnLockPosZ.MouseEnter += (s, e) => { btnLockPosZ.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
+            btnLockPosZ.MouseLeave += (s, e) => { btnLockPosZ.FlatAppearance.MouseDownBackColor = Color.Transparent; };
 
             this.Deactivate += (s, e) =>
             {
@@ -203,6 +225,9 @@ namespace Mandelbrot
             yValueLabel = new Label();
             zValueLabel = new Label();
             zInput = new TextBox();
+            btnLockPosX = new Button();
+            btnLockPosY = new Button();
+            btnLockPosZ = new Button();
             ((ISupportInitialize)_iterationsControl).BeginInit();
             SuspendLayout();
             // 
@@ -285,14 +310,14 @@ namespace Mandelbrot
             // 
             // xInput
             // 
-            xInput.Location = new Point(67, 138);
+            xInput.Location = new Point(85, 139);
             xInput.Name = "xInput";
             xInput.Size = new Size(238, 27);
             xInput.TabIndex = 10;
             // 
             // yInput
             // 
-            yInput.Location = new Point(67, 171);
+            yInput.Location = new Point(85, 170);
             yInput.Name = "yInput";
             yInput.Size = new Size(238, 27);
             yInput.TabIndex = 11;
@@ -347,15 +372,60 @@ namespace Mandelbrot
             // zInput
             // 
             zInput.Enabled = false;
-            zInput.Location = new Point(67, 204);
+            zInput.Location = new Point(85, 203);
             zInput.Name = "zInput";
             zInput.Size = new Size(238, 27);
             zInput.TabIndex = 16;
+            // 
+            // btnLockPosX
+            // 
+            btnLockPosX.BackColor = Color.Transparent;
+            btnLockPosX.BackgroundImageLayout = ImageLayout.Stretch;
+            btnLockPosX.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btnLockPosX.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            btnLockPosX.FlatStyle = FlatStyle.Flat;
+            btnLockPosX.Location = new Point(53, 138);
+            btnLockPosX.Name = "btnLockPosX";
+            btnLockPosX.Size = new Size(26, 29);
+            btnLockPosX.TabIndex = 17;
+            btnLockPosX.UseVisualStyleBackColor = false;
+            btnLockPosX.Click += btnLockPosX_Click;
+            // 
+            // btnLockPosY
+            // 
+            btnLockPosY.BackColor = Color.Transparent;
+            btnLockPosY.BackgroundImageLayout = ImageLayout.Stretch;
+            btnLockPosY.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btnLockPosY.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            btnLockPosY.FlatStyle = FlatStyle.Flat;
+            btnLockPosY.Location = new Point(53, 170);
+            btnLockPosY.Name = "btnLockPosY";
+            btnLockPosY.Size = new Size(26, 29);
+            btnLockPosY.TabIndex = 18;
+            btnLockPosY.UseVisualStyleBackColor = false;
+            btnLockPosY.Click += btnLockPosY_Click;
+            // 
+            // btnLockPosZ
+            // 
+            btnLockPosZ.BackColor = Color.Transparent;
+            btnLockPosZ.BackgroundImageLayout = ImageLayout.Stretch;
+            btnLockPosZ.Enabled = false;
+            btnLockPosZ.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btnLockPosZ.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            btnLockPosZ.FlatStyle = FlatStyle.Flat;
+            btnLockPosZ.Location = new Point(53, 203);
+            btnLockPosZ.Name = "btnLockPosZ";
+            btnLockPosZ.Size = new Size(26, 29);
+            btnLockPosZ.TabIndex = 19;
+            btnLockPosZ.UseVisualStyleBackColor = false;
             // 
             // ControlForm
             // 
             AutoValidate = AutoValidate.Disable;
             ClientSize = new Size(360, 344);
+            Controls.Add(btnLockPosZ);
+            Controls.Add(btnLockPosY);
+            Controls.Add(btnLockPosX);
             Controls.Add(zInput);
             Controls.Add(zValueLabel);
             Controls.Add(yValueLabel);
@@ -374,6 +444,7 @@ namespace Mandelbrot
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             Name = "ControlForm";
+            Text = "xzq";
             ((ISupportInitialize)_iterationsControl).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -425,12 +496,54 @@ namespace Mandelbrot
 
         private void BtnGPU32_CheckedChanged(object sender, EventArgs e)
         {
-            _fractalWindow.changeRenderer("GPU32");
+            if (((RadioButton)sender).Checked)
+            {
+                _fractalWindow.changeRenderer("GPU32");
+            }
         }
 
         private void btnGPU64_CheckedChanged(object sender, EventArgs e)
         {
-            _fractalWindow.changeRenderer("GPU64");
+            if (((RadioButton)sender).Checked)
+            {
+                _fractalWindow.changeRenderer("GPU64");
+            }
+        }
+
+        private void btnLockPosX_Click(object sender, EventArgs e)
+        {
+            if (btnLockPosX.BackgroundImage == unlockIMG)
+            {
+                btnLockPosX.BackgroundImage = lockIMG;
+                isEditingXPos = false;
+                xInput.Enabled = false;
+                _fractalWindow.LockCenterPos('x', true);
+            }
+            else
+            {
+                btnLockPosX.BackgroundImage = unlockIMG;
+                isEditingXPos = true;
+                xInput.Enabled = true;
+                _fractalWindow.LockCenterPos('x', false);
+            }
+        }
+
+        private void btnLockPosY_Click(object sender, EventArgs e)
+        {
+            if (btnLockPosY.BackgroundImage == unlockIMG)
+            {
+                btnLockPosY.BackgroundImage = lockIMG;
+                isEditingYPos = false;
+                yInput.Enabled = false;
+                _fractalWindow.LockCenterPos('y', true);
+            }
+            else
+            {
+                btnLockPosY.BackgroundImage = unlockIMG;
+                isEditingYPos = true;
+                yInput.Enabled = true;
+                _fractalWindow.LockCenterPos('y', false);
+            }
         }
     }
 }
