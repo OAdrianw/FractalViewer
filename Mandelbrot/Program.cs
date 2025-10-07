@@ -21,10 +21,9 @@ namespace Mandelbrot
         private InputHandler _inputHandler;
         private Renderer _renderer;
         private ConcurrentQueue<string> _shaderCommandQueue = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> _fractalPaletteQueue = new ConcurrentQueue<string>();
 
-
-
-        private double _timeSinceLastFpsUpdate = 0.0;
+        private double _timeSinceLastFpsUpdate = 0.0;
         private int _frameCount = 0;
         private int _currentFps = 0;
         private float _frameTimeMs = 0.0f;
@@ -116,6 +115,7 @@ namespace Mandelbrot
 
             nativeWindowSettings.Location = new Vector2i(StartX, StartY);
             _shaderCommandQueue.Enqueue("GPU32");
+            _fractalPaletteQueue.Enqueue("Classic");
         }
 
 
@@ -141,6 +141,11 @@ namespace Mandelbrot
                 currentCenterPD.Y = val; 
                 target_CenterPD.Y = val; 
             }
+        }
+
+        public void SetColorPalette(string paletteName)
+        {
+            _fractalPaletteQueue.Enqueue(paletteName);
         }
 
         public void changeRenderer(string newRendererType)
@@ -352,6 +357,12 @@ namespace Mandelbrot
                 Console.WriteLine($"Switched to {renderType} renderer.");
                 Console.WriteLine($"Previous renderer: {previousRenderType}");
                 previousRenderType = renderType;
+            }
+
+            while (_fractalPaletteQueue.TryDequeue(out string paletteName))
+            {
+                _renderer.SetPalette(paletteName);
+                Console.WriteLine($"Switched to {paletteName} palette.");
             }
 
             _renderer.MIterations = MIterations;

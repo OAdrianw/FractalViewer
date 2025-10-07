@@ -2,6 +2,7 @@
 using System;
 using OpenTK.Mathematics;
 using System.ComponentModel;
+using System.Drawing.Drawing2D;
 
 
 namespace Mandelbrot
@@ -9,6 +10,8 @@ namespace Mandelbrot
     internal class ControlForm : Form
     {
         private readonly Program _fractalWindow;
+        private ToolStripDropDown _colorMenu;
+
         private Label _fpsLabel;
         private Label _frameTimeLabel;
         private Label _nPowerLabel;
@@ -35,6 +38,7 @@ namespace Mandelbrot
         private RadioButton btnGPU64;
 
         private Image lockIMG;
+        private Button btnColorPick;
         private Image unlockIMG;
 
         public ControlForm(Program game)
@@ -228,6 +232,7 @@ namespace Mandelbrot
             btnLockPosX = new Button();
             btnLockPosY = new Button();
             btnLockPosZ = new Button();
+            btnColorPick = new Button();
             ((ISupportInitialize)_iterationsControl).BeginInit();
             SuspendLayout();
             // 
@@ -419,10 +424,31 @@ namespace Mandelbrot
             btnLockPosZ.TabIndex = 19;
             btnLockPosZ.UseVisualStyleBackColor = false;
             // 
+            // btnColorPick
+            // 
+            btnColorPick.Location = new Point(64, 70);
+            btnColorPick.Name = "btnColorPick";
+            btnColorPick.Size = new Size(259, 29);
+            btnColorPick.TabIndex = 20;
+            btnColorPick.Text = "Classic";
+            btnColorPick.UseVisualStyleBackColor = true;
+            btnColorPick.Click += (s, e) =>
+            {
+                if (_colorMenu != null && _colorMenu.Visible)
+                {
+                    _colorMenu.Close();
+                } else
+                {
+                    SetupColorMenu();
+                    _colorMenu.Show(btnColorPick, new Point(0, btnColorPick.Height));
+                }
+            };
+            // 
             // ControlForm
             // 
             AutoValidate = AutoValidate.Disable;
             ClientSize = new Size(360, 344);
+            Controls.Add(btnColorPick);
             Controls.Add(btnLockPosZ);
             Controls.Add(btnLockPosY);
             Controls.Add(btnLockPosX);
@@ -453,6 +479,50 @@ namespace Mandelbrot
         private void _iterationsControl_ValueChanged(object sender, EventArgs e)
         {
             _fractalWindow.SetIterations((int)_iterationsControl.Value);
+        }
+
+        private void SetupColorMenu()
+        {
+            _colorMenu = new ContextMenuStrip();
+            _colorMenu.AutoSize = false;
+            _colorMenu.Size = new Size(btnColorPick.Width, 200);
+
+            var width = btnColorPick.Width;
+
+            var colors = new List<Button> {
+                        new Button { Text = "Classic"},
+                        new Button { Text = "Fiery Nebula"},
+                        new Button { Text = "Arctic Ice"},
+                        new Button { Text = "Psychedelic Trip"},
+                        new Button { Text = "Royal Gold"},
+                        new Button { Text = "Forest Floor"},
+                        new Button { Text = "Grayscale"},
+            };
+
+            foreach (var color in colors) {
+                ToolStripMenuItem item = new ToolStripMenuItem
+                {
+                    Text = color.Text,
+                    BackColor = Color.DimGray,
+                    ForeColor = Color.White,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    AutoSize = false,
+                    Width = width - 1,
+                    Height = 30,
+                };
+                
+                var colour = item.BackColor;
+
+                item.MouseEnter += (s, e) => { colour = Color.FromArgb(Math.Min(colour.R + 20, 255), Math.Min(colour.G + 20, 255), Math.Min(colour.B + 20, 255)); };
+                item.MouseLeave += (s, e) => { colour = Color.FromArgb(Math.Max(colour.R - 20, 0), Math.Max(colour.G - 20, 0), Math.Max(colour.B - 20, 0)); };
+                item.Click += (s, e) =>
+                {
+                    btnColorPick.Text = item.Text;
+                    _fractalWindow.SetColorPalette(item.Text);
+                };
+                _colorMenu.Items.Add(item);
+            }   
+
         }
 
         private void _zoomFactorUpdated(object sender, KeyPressEventArgs e)

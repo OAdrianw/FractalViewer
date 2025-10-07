@@ -18,7 +18,8 @@ namespace Mandelbrot
     {
 
         private Shader _shader32, _shader64, _activeShader;
-        private Palette _palette;
+        private Dictionary<string, Palette> _palettes;
+        private string _currentPaletteName = "Classic";
         private Vector3[] colors;
 
         private int _vertexBufferObject;
@@ -54,8 +55,105 @@ namespace Mandelbrot
         public Renderer(string type = "GPU32")
         {
             renderType = type;
+            InitializePalettes();
         }
 
+        private void InitializePalettes()
+        {
+            _palettes = new Dictionary<string, Palette>();
+
+            // Classic Palette
+            var classic = new Palette();
+            classic.Add(new Vector3(255, 255, 255)); 
+            classic.Add(new Vector3(224, 224, 224));
+            classic.Add(new Vector3(192, 192, 192));
+            classic.Add(new Vector3(160, 160, 160));
+            classic.Add(new Vector3(128, 128, 128)); 
+            classic.Add(new Vector3(96, 96, 96));
+            classic.Add(new Vector3(64, 64, 64));
+            classic.Add(new Vector3(32, 32, 32));
+            classic.Add(new Vector3(0, 0, 0));       
+            _palettes.Add("Classic", classic);
+
+            // Fiery Nebula Palette
+            var fieryNebula = new Palette();
+            fieryNebula.Add(new Vector3(0, 0, 0));       
+            fieryNebula.Add(new Vector3(25, 7, 26));     
+            fieryNebula.Add(new Vector3(139, 0, 0));     
+            fieryNebula.Add(new Vector3(255, 69, 0));   
+            fieryNebula.Add(new Vector3(255, 140, 0));   
+            fieryNebula.Add(new Vector3(255, 165, 0));   
+            fieryNebula.Add(new Vector3(255, 215, 0));  
+            fieryNebula.Add(new Vector3(255, 255, 0));   
+            fieryNebula.Add(new Vector3(255, 255, 224)); 
+            fieryNebula.Add(new Vector3(255, 255, 255)); 
+            _palettes.Add("Fiery Nebula", fieryNebula);
+
+            // Arctic Ice Palette
+            var arcticIce = new Palette();
+            arcticIce.Add(new Vector3(0, 0, 0));         
+            arcticIce.Add(new Vector3(7, 25, 42));       
+            arcticIce.Add(new Vector3(14, 49, 81));      
+            arcticIce.Add(new Vector3(20, 74, 121));    
+            arcticIce.Add(new Vector3(48, 120, 179));    
+            arcticIce.Add(new Vector3(100, 164, 218));  
+            arcticIce.Add(new Vector3(154, 209, 255));   
+            arcticIce.Add(new Vector3(200, 230, 255));   
+            arcticIce.Add(new Vector3(230, 245, 255));   
+            arcticIce.Add(new Vector3(255, 255, 255));   
+            _palettes.Add("Arctic Ice", arcticIce);
+
+            // Psychedelic Trip Palette
+            var psychedelicTrip = new Palette();
+            psychedelicTrip.Add(new Vector3(255, 0, 255));  
+            psychedelicTrip.Add(new Vector3(148, 0, 211));   
+            psychedelicTrip.Add(new Vector3(75, 0, 130));    
+            psychedelicTrip.Add(new Vector3(0, 0, 255));     
+            psychedelicTrip.Add(new Vector3(0, 255, 0));     
+            psychedelicTrip.Add(new Vector3(255, 255, 0));   
+            psychedelicTrip.Add(new Vector3(255, 127, 0));   
+            psychedelicTrip.Add(new Vector3(255, 0, 0));     
+            _palettes.Add("Psychedelic Trip", psychedelicTrip);
+
+            // Royal Gold Palette
+            var royalGold = new Palette();
+            royalGold.Add(new Vector3(19, 11, 36));      
+            royalGold.Add(new Vector3(45, 20, 60));      
+            royalGold.Add(new Vector3(87, 39, 87));      
+            royalGold.Add(new Vector3(145, 78, 109));    
+            royalGold.Add(new Vector3(203, 128, 131));   
+            royalGold.Add(new Vector3(244, 181, 153));   
+            royalGold.Add(new Vector3(255, 217, 169));   
+            royalGold.Add(new Vector3(255, 239, 192));   
+            royalGold.Add(new Vector3(240, 240, 240));   
+            _palettes.Add("Royal Gold", royalGold);
+
+            // Forest Floor Palette
+            var forestFloor = new Palette();
+            forestFloor.Add(new Vector3(20, 30, 10));      
+            forestFloor.Add(new Vector3(34, 52, 23));     
+            forestFloor.Add(new Vector3(53, 75, 34));      
+            forestFloor.Add(new Vector3(87, 101, 48));     
+            forestFloor.Add(new Vector3(130, 125, 64));    
+            forestFloor.Add(new Vector3(101, 67, 33));     
+            forestFloor.Add(new Vector3(60, 41, 20));      
+            forestFloor.Add(new Vector3(30, 20, 10));      
+            _palettes.Add("Forest Floor", forestFloor);
+
+            // Grayscale Palette
+            var grayscale = new Palette();
+            grayscale.Add(new Vector3(0, 0, 0));
+            grayscale.Add(new Vector3(32, 32, 32));
+            grayscale.Add(new Vector3(64, 64, 64));
+            grayscale.Add(new Vector3(96, 96, 96));
+            grayscale.Add(new Vector3(128, 128, 128));
+            grayscale.Add(new Vector3(160, 160, 160));
+            grayscale.Add(new Vector3(192, 192, 192));
+            grayscale.Add(new Vector3(224, 224, 224));
+            grayscale.Add(new Vector3(255, 255, 255));
+            _palettes.Add("Grayscale", grayscale);
+
+        }
         public void SetRenderType(string type, IGLFWGraphicsContext context, Vector2i Size)
         {
             context.MakeCurrent(); 
@@ -95,17 +193,8 @@ namespace Mandelbrot
             GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), 0);
 
             GL.EnableVertexAttribArray(0);
-            
 
-            _palette = new Palette();
-            _palette.Add(new Vector3(255, 255, 255));
-            _palette.Add(new Vector3(255, 165, 0));
-            _palette.Add(new Vector3(255, 255, 0));
-            _palette.Add(new Vector3(0, 128, 0));
-            _palette.Add(new Vector3(0, 0, 255));
-            _palette.Add(new Vector3(128, 0, 128));
-
-            colors = _palette.getColorsNorm();
+            colors = _palettes[_currentPaletteName].getColorsNorm();
 
 
             _shader32 = new Shader("Shaders/mandelbrot.vert", "Shaders/mandelbrot32.frag");
@@ -222,6 +311,15 @@ namespace Mandelbrot
             GL.DeleteVertexArray(_vertexArrayObject);
         }
 
+        public void SetPalette(string paletteName)
+        {
+            if (_palettes.ContainsKey(paletteName))
+            {
+                _currentPaletteName = paletteName;
+                colors = _palettes[paletteName].getColorsNorm();
+                colorFractal();
+            }
+        }
     }
 
 
