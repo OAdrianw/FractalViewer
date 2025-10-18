@@ -3,6 +3,7 @@ using System;
 using OpenTK.Mathematics;
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
+using System.Runtime.CompilerServices;
 
 
 namespace Mandelbrot
@@ -10,86 +11,38 @@ namespace Mandelbrot
     internal class ControlForm : Form
     {
         private readonly Program _fractalWindow;
-        private ToolStripDropDown _colorMenu;
-
-        private Label _fpsLabel;
-        private Label _frameTimeLabel;
-        private Label _nPowerLabel;
-        private Label _iterationsLabel;
-        private TextBox zoomInput;
-        private bool isEditingTextBox = false;
-        private bool isEditingXPos = false;
-        private bool isEditingYPos = false;
-        private bool isEditingZPos = false;
-        private Label zoomLabel;
+        private string _fractalType;
+        
         private NumericUpDown _iterationsControl;
         float sideLength = 3.4f;
         double sideLengthPD = 3.4;
-        private Label xValueLabel;
-        private TextBox xInput;
-        private TextBox yInput;
-        private Label yValueLabel;
-        private TextBox zInput;
-        private Label zValueLabel;
-        private RadioButton btnGPU32;
-        private Button btnLockPosX;
-        private Button btnLockPosY;
-        private Button btnLockPosZ;
-        private RadioButton btnGPU64;
 
         private Image lockIMG;
         private Button btnColorPick;
         private Image unlockIMG;
+        private bool isEditingTextBox;
 
         public ControlForm(Program game)
         {
             _fractalWindow = game;
-
-            Text = "Control Panel";
-            Width = 500;
-            AutoScroll = true;
+            _fractalType = _fractalWindow._fractalType;
 
             _fractalWindow.OnPerformanceMetricsUpdated += UpdatePerformanceLabels;
-            _fractalWindow.OnZoomUpdated += OnZoomUpdated;
             _fractalWindow.OnCenterUpdated += OnCenterUpdate;
-
-            InitializeComponent();
-
-            _iterationsControl.Value = _fractalWindow.MIterations;
-
-            zoomInput.GotFocus += (sender, e) => { isEditingTextBox = true; };
-            zoomInput.Validated += (sender, e) => { isEditingTextBox = false; };
-            zoomInput.KeyPress += _zoomFactorUpdated;
-
-            xInput.GotFocus += (s, e) => { isEditingXPos = true; };
-            xInput.KeyPress += (s, e) => { if (e.KeyChar == '\r') { e.Handled = true; _updateCenterPos('x', xInput, ref isEditingXPos); } };
-            xInput.Leave += (s, e) => { isEditingXPos = false; };
-
-            yInput.GotFocus += (s, e) => { isEditingYPos = true; };
-            yInput.KeyPress += (s, e) => { if (e.KeyChar == '\r') { e.Handled = true; _updateCenterPos('y', yInput, ref isEditingYPos); } };
-            yInput.Leave += (s, e) => { isEditingYPos = false; };
-
-
+            _fractalWindow.OnZoomUpdated += OnZoomUpdated;
+            
             lockIMG = Image.FromFile("Assets/lock.png");
             unlockIMG = Image.FromFile("Assets/unlock.png");
 
-            btnLockPosX.BackgroundImage = unlockIMG;
-            btnLockPosX.MouseEnter += (s, e) => { btnLockPosX.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
-            btnLockPosX.MouseLeave += (s, e) => { btnLockPosX.FlatAppearance.MouseDownBackColor = Color.Transparent; };
+            InitializeComponent();
 
-            btnLockPosY.BackgroundImage = unlockIMG;
-            btnLockPosY.MouseEnter += (s, e) => { btnLockPosY.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
-            btnLockPosY.MouseLeave += (s, e) => { btnLockPosY.FlatAppearance.MouseDownBackColor = Color.Transparent; };
-
-            btnLockPosZ.BackgroundImage = unlockIMG;
-            btnLockPosZ.MouseEnter += (s, e) => { btnLockPosZ.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
-            btnLockPosZ.MouseLeave += (s, e) => { btnLockPosZ.FlatAppearance.MouseDownBackColor = Color.Transparent; };
+            BuildControlUI();
 
             this.Deactivate += (s, e) =>
             {
                 isEditingTextBox = false;
-                isEditingXPos = false;
-                isEditingYPos = false;
+                //isEditingXPos = false;
+                //isEditingYPos = false;
             };
 
         }
@@ -105,6 +58,9 @@ namespace Mandelbrot
             {
                 this.Invoke(() =>
                 {
+                    Label _fpsLabel = Controls.OfType<Label>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.ID == "fps");
+                    Label _frameTimeLabel = Controls.OfType<Label>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.ID == "frameTime");
+
                     _fpsLabel.Text = $"FPS: {fps}";
                     _frameTimeLabel.Text = $"FrameTime: {frameTimeMs:F2}ms";
                 });
@@ -112,6 +68,9 @@ namespace Mandelbrot
             }
             else
             {
+                Label _fpsLabel = Controls.OfType<Label>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.ID == "fps");
+                Label _frameTimeLabel = Controls.OfType<Label>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.ID == "frameTime");
+
                 _fpsLabel.Text = $"FPS: {fps}";
                 _frameTimeLabel.Text = $"FrameTime: {frameTimeMs:F2}ms";
             }
@@ -128,26 +87,82 @@ namespace Mandelbrot
 
             if (this.InvokeRequired)
             {
+                IEnumerable<TextBox> positionInputControls = this.Controls
+                                                        .OfType<TextBox>()
+                                                        .Where(tb => tb.Tag is ControlObjectAttributes attr && attr.Type == "Position");
+
                 this.Invoke(() =>
                 {
-                    if (!isEditingXPos && !isEditingYPos && !isEditingZPos)
+                    bool isEditingPosition = false;
+                    foreach (TextBox axisInput in positionInputControls)
                     {
-                        xInput.Text = $"{value.X:F12}";
-                        yInput.Text = $"{value.Y:F12}";
-                        zInput.Text = $"0.00";
+                        if (((ControlObjectAttributes)axisInput.Tag).IsEditable)
+                        {
+                            isEditingPosition = true;
+                            break;
+                        }
+                    }
+
+                    if (!isEditingPosition)
+                    {
+                        foreach (var input in positionInputControls)
+                        {
+                            var attr = (ControlObjectAttributes)input.Tag;
+
+                            switch (attr.ID)
+                            {
+                                case "x":
+                                    input.Text = $"{value.X:F12}";
+                                    break;
+                                case "y":
+                                    input.Text = $"{value.Y:F12}";
+                                    break;
+                                case "z":
+                                    input.Text = $"{value.Z:F12}";
+                                    break;
+                            }
+                        }
                     }
                 });
 
             }
             else
             {
-                if (!isEditingXPos && !isEditingYPos && !isEditingZPos)
+                IEnumerable<TextBox> positionInputControls = this.Controls
+                                                       .OfType<TextBox>()
+                                                       .Where(tb => tb.Tag is ControlObjectAttributes attr && attr.Type == "Position");
+                bool isEditingPosition = false;
+                foreach (TextBox axisInput in positionInputControls)
                 {
-                    xInput.Text = $"{value.X:F12}";
-                    yInput.Text = $"{value.Y:F12}";
-                    zInput.Text = $"0.00";
+                    if (((ControlObjectAttributes)axisInput.Tag).IsEditable)
+                    {
+                        isEditingPosition = true;
+                        break;
+                    }
+                }
+
+                if (!isEditingPosition)
+                {
+                    foreach (var input in positionInputControls)
+                    {
+                        var attr = (ControlObjectAttributes)input.Tag;
+
+                        switch (attr.ID)
+                        {
+                            case "x":
+                                input.Text = $"{value.X:F12}";
+                                break;
+                            case "y":
+                                input.Text = $"{value.Y:F12}";
+                                break;
+                            case "z":
+                                input.Text = $"{value.Z:F12}";
+                                break;
+                        }
+                    }
                 }
             }
+
         }
 
         private void OnZoomUpdated(double newLength)
@@ -162,10 +177,10 @@ namespace Mandelbrot
             {
                 this.Invoke(() =>
                 {
-                    if (!isEditingTextBox)
+                    TextBox zoomInput = Controls.OfType<TextBox>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.Type == "Zoom");
+                    if (zoomInput == null) return;
+                    if (!((ControlObjectAttributes)zoomInput.Tag).IsEditable)
                     {
-
-
                         double value = (sideLength / newLength);
 
                         if (value > 10e3)
@@ -184,7 +199,9 @@ namespace Mandelbrot
             }
             else
             {
-                if (!isEditingTextBox)
+                TextBox zoomInput = Controls.OfType<TextBox>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.Type == "Zoom");
+                if (zoomInput == null) return;
+                if (!((ControlObjectAttributes)zoomInput.Tag).IsEditable)
                 {
                     double value = (sideLength / newLength);
 
@@ -212,282 +229,131 @@ namespace Mandelbrot
             base.OnFormClosing(e);
         }
 
-        private void InitializeComponent()
-        {
-            _fpsLabel = new Label();
-            _frameTimeLabel = new Label();
-            _iterationsLabel = new Label();
-            _nPowerLabel = new Label();
-            _iterationsControl = new NumericUpDown();
-            zoomInput = new TextBox();
-            zoomLabel = new Label();
-            xValueLabel = new Label();
-            xInput = new TextBox();
-            yInput = new TextBox();
-            btnGPU32 = new RadioButton();
-            btnGPU64 = new RadioButton();
-            yValueLabel = new Label();
-            zValueLabel = new Label();
-            zInput = new TextBox();
-            btnLockPosX = new Button();
-            btnLockPosY = new Button();
-            btnLockPosZ = new Button();
-            btnColorPick = new Button();
-            ((ISupportInitialize)_iterationsControl).BeginInit();
+        private void InitializeComponent() { 
             SuspendLayout();
-            // 
-            // _fpsLabel
-            // 
-            _fpsLabel.BorderStyle = BorderStyle.Fixed3D;
-            _fpsLabel.Location = new Point(12, 9);
-            _fpsLabel.Name = "_fpsLabel";
-            _fpsLabel.Size = new Size(68, 22);
-            _fpsLabel.TabIndex = 0;
-            _fpsLabel.Text = "FPS:    ";
-            _fpsLabel.TextAlign = ContentAlignment.TopCenter;
-            // 
-            // _frameTimeLabel
-            // 
-            _frameTimeLabel.BorderStyle = BorderStyle.Fixed3D;
-            _frameTimeLabel.Location = new Point(188, 9);
-            _frameTimeLabel.Name = "_frameTimeLabel";
-            _frameTimeLabel.Size = new Size(160, 22);
-            _frameTimeLabel.TabIndex = 1;
-            _frameTimeLabel.Text = "FrameTime:       ";
-            _frameTimeLabel.TextAlign = ContentAlignment.TopCenter;
-            // 
-            // _iterationsLabel
-            // 
-            _iterationsLabel.AutoSize = true;
-            _iterationsLabel.BorderStyle = BorderStyle.FixedSingle;
-            _iterationsLabel.Location = new Point(13, 37);
-            _iterationsLabel.Name = "_iterationsLabel";
-            _iterationsLabel.Size = new Size(73, 22);
-            _iterationsLabel.TabIndex = 3;
-            _iterationsLabel.Text = "Iterations";
-            // 
-            // _nPowerLabel
-            // 
-            _nPowerLabel.AutoSize = true;
-            _nPowerLabel.BorderStyle = BorderStyle.FixedSingle;
-            _nPowerLabel.Location = new Point(264, 37);
-            _nPowerLabel.Name = "_nPowerLabel";
-            _nPowerLabel.Size = new Size(84, 22);
-            _nPowerLabel.TabIndex = 4;
-            _nPowerLabel.Text = "Power(n): 2";
-            // 
-            // _iterationsControl
-            // 
-            _iterationsControl.Increment = new decimal(new int[] { 16, 0, 0, 0 });
-            _iterationsControl.Location = new Point(90, 37);
-            _iterationsControl.Maximum = new decimal(new int[] { 65536, 0, 0, 0 });
-            _iterationsControl.Name = "_iterationsControl";
-            _iterationsControl.Size = new Size(81, 27);
-            _iterationsControl.TabIndex = 5;
-            _iterationsControl.TextAlign = HorizontalAlignment.Center;
-            _iterationsControl.ValueChanged += _iterationsControl_ValueChanged;
-            // 
-            // zoomInput
-            // 
-            zoomInput.Location = new Point(67, 105);
-            zoomInput.Name = "zoomInput";
-            zoomInput.Size = new Size(104, 27);
-            zoomInput.TabIndex = 7;
-            zoomInput.TextAlign = HorizontalAlignment.Center;
-            // 
-            // zoomLabel
-            // 
-            zoomLabel.AutoSize = true;
-            zoomLabel.Location = new Point(12, 108);
-            zoomLabel.Name = "zoomLabel";
-            zoomLabel.Size = new Size(49, 20);
-            zoomLabel.TabIndex = 8;
-            zoomLabel.Text = "Zoom";
-            // 
-            // xValueLabel
-            // 
-            xValueLabel.AutoSize = true;
-            xValueLabel.Location = new Point(24, 142);
-            xValueLabel.Name = "xValueLabel";
-            xValueLabel.Size = new Size(29, 20);
-            xValueLabel.TabIndex = 9;
-            xValueLabel.Text = "X : ";
-            // 
-            // xInput
-            // 
-            xInput.Location = new Point(85, 139);
-            xInput.Name = "xInput";
-            xInput.Size = new Size(238, 27);
-            xInput.TabIndex = 10;
-            // 
-            // yInput
-            // 
-            yInput.Location = new Point(85, 170);
-            yInput.Name = "yInput";
-            yInput.Size = new Size(238, 27);
-            yInput.TabIndex = 11;
-            // 
-            // btnGPU32
-            // 
-            btnGPU32.AutoSize = true;
-            btnGPU32.CheckAlign = ContentAlignment.MiddleRight;
-            btnGPU32.Checked = true;
-            btnGPU32.Location = new Point(53, 296);
-            btnGPU32.Name = "btnGPU32";
-            btnGPU32.Size = new Size(74, 24);
-            btnGPU32.TabIndex = 12;
-            btnGPU32.TabStop = true;
-            btnGPU32.Text = "GPU32";
-            btnGPU32.TextAlign = ContentAlignment.TopCenter;
-            btnGPU32.UseVisualStyleBackColor = true;
-            btnGPU32.CheckedChanged += BtnGPU32_CheckedChanged;
-            // 
-            // btnGPU64
-            // 
-            btnGPU64.AutoSize = true;
-            btnGPU64.CheckAlign = ContentAlignment.MiddleRight;
-            btnGPU64.Location = new Point(188, 296);
-            btnGPU64.Name = "btnGPU64";
-            btnGPU64.Size = new Size(74, 24);
-            btnGPU64.TabIndex = 13;
-            btnGPU64.Text = "GPU64";
-            btnGPU64.TextAlign = ContentAlignment.TopCenter;
-            btnGPU64.UseVisualStyleBackColor = true;
-            btnGPU64.CheckedChanged += btnGPU64_CheckedChanged;
-            // 
-            // yValueLabel
-            // 
-            yValueLabel.AutoSize = true;
-            yValueLabel.Location = new Point(24, 174);
-            yValueLabel.Name = "yValueLabel";
-            yValueLabel.Size = new Size(28, 20);
-            yValueLabel.TabIndex = 14;
-            yValueLabel.Text = "Y : ";
-            // 
-            // zValueLabel
-            // 
-            zValueLabel.AutoSize = true;
-            zValueLabel.Enabled = false;
-            zValueLabel.Location = new Point(24, 207);
-            zValueLabel.Name = "zValueLabel";
-            zValueLabel.Size = new Size(29, 20);
-            zValueLabel.TabIndex = 15;
-            zValueLabel.Text = "Z : ";
-            // 
-            // zInput
-            // 
-            zInput.Enabled = false;
-            zInput.Location = new Point(85, 203);
-            zInput.Name = "zInput";
-            zInput.Size = new Size(238, 27);
-            zInput.TabIndex = 16;
-            // 
-            // btnLockPosX
-            // 
-            btnLockPosX.BackColor = Color.Transparent;
-            btnLockPosX.BackgroundImageLayout = ImageLayout.Stretch;
-            btnLockPosX.FlatAppearance.MouseDownBackColor = Color.Transparent;
-            btnLockPosX.FlatAppearance.MouseOverBackColor = Color.Transparent;
-            btnLockPosX.FlatStyle = FlatStyle.Flat;
-            btnLockPosX.Location = new Point(53, 138);
-            btnLockPosX.Name = "btnLockPosX";
-            btnLockPosX.Size = new Size(26, 29);
-            btnLockPosX.TabIndex = 17;
-            btnLockPosX.UseVisualStyleBackColor = false;
-            btnLockPosX.Click += btnLockPosX_Click;
-            // 
-            // btnLockPosY
-            // 
-            btnLockPosY.BackColor = Color.Transparent;
-            btnLockPosY.BackgroundImageLayout = ImageLayout.Stretch;
-            btnLockPosY.FlatAppearance.MouseDownBackColor = Color.Transparent;
-            btnLockPosY.FlatAppearance.MouseOverBackColor = Color.Transparent;
-            btnLockPosY.FlatStyle = FlatStyle.Flat;
-            btnLockPosY.Location = new Point(53, 170);
-            btnLockPosY.Name = "btnLockPosY";
-            btnLockPosY.Size = new Size(26, 29);
-            btnLockPosY.TabIndex = 18;
-            btnLockPosY.UseVisualStyleBackColor = false;
-            btnLockPosY.Click += btnLockPosY_Click;
-            // 
-            // btnLockPosZ
-            // 
-            btnLockPosZ.BackColor = Color.Transparent;
-            btnLockPosZ.BackgroundImageLayout = ImageLayout.Stretch;
-            btnLockPosZ.Enabled = false;
-            btnLockPosZ.FlatAppearance.MouseDownBackColor = Color.Transparent;
-            btnLockPosZ.FlatAppearance.MouseOverBackColor = Color.Transparent;
-            btnLockPosZ.FlatStyle = FlatStyle.Flat;
-            btnLockPosZ.Location = new Point(53, 203);
-            btnLockPosZ.Name = "btnLockPosZ";
-            btnLockPosZ.Size = new Size(26, 29);
-            btnLockPosZ.TabIndex = 19;
-            btnLockPosZ.UseVisualStyleBackColor = false;
-            // 
-            // btnColorPick
-            // 
-            btnColorPick.Location = new Point(64, 70);
-            btnColorPick.Name = "btnColorPick";
-            btnColorPick.Size = new Size(259, 29);
-            btnColorPick.TabIndex = 20;
-            btnColorPick.Text = "Classic";
-            btnColorPick.UseVisualStyleBackColor = true;
-            btnColorPick.Click += (s, e) =>
-            {
-                if (_colorMenu != null && _colorMenu.Visible)
-                {
-                    _colorMenu.Close();
-                } else
-                {
-                    SetupColorMenu();
-                    _colorMenu.Show(btnColorPick, new Point(0, btnColorPick.Height));
-                }
-            };
-            // 
-            // ControlForm
-            // 
-            AutoValidate = AutoValidate.Disable;
+
             ClientSize = new Size(360, 344);
-            Controls.Add(btnColorPick);
-            Controls.Add(btnLockPosZ);
-            Controls.Add(btnLockPosY);
-            Controls.Add(btnLockPosX);
-            Controls.Add(zInput);
-            Controls.Add(zValueLabel);
-            Controls.Add(yValueLabel);
-            Controls.Add(btnGPU64);
-            Controls.Add(btnGPU32);
-            Controls.Add(yInput);
-            Controls.Add(xInput);
-            Controls.Add(xValueLabel);
-            Controls.Add(zoomLabel);
-            Controls.Add(zoomInput);
-            Controls.Add(_iterationsControl);
-            Controls.Add(_nPowerLabel);
-            Controls.Add(_iterationsLabel);
-            Controls.Add(_frameTimeLabel);
-            Controls.Add(_fpsLabel);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            Text = $"Fractal Panel ({_fractalType})";
             Name = "ControlForm";
-            Text = "xzq";
-            ((ISupportInitialize)_iterationsControl).EndInit();
+
+            AutoScroll = true;
             ResumeLayout(false);
-            PerformLayout();
+        }
+
+        private void BuildControlUI() {
+            SuspendLayout();
+
+            Text = $"Fractal Panel ({_fractalType})";
+
+            ResumeLayout(false);
+
+            switch (_fractalType)
+            {
+                case "Mandelbrot":
+                    SetupUI_Mandelbrot();
+                    break;
+                case "Julia":
+                    SetupUI_Julia();
+                    break;
+            }
+        }
+
+        private void SetupUI_Julia()
+        {
+
+            SuspendLayout();
+
+            Controls.Clear();
+
+            AddControlUI(ControlType.Fps);
+            AddControlUI(ControlType.FrameTime);
+            AddControlUI(ControlType.Iterations);
+            AddControlUI(ControlType.NPower);
+            AddControlUI(ControlType.Position, ["x", "138"]);
+            AddControlUI(ControlType.Position, ["y", "166"]);
+            AddControlUI(ControlType.Zoom);
+            AddControlUI(ControlType.RenderType, ["GPU32", "53", "296"]);
+            AddControlUI(ControlType.RenderType, ["GPU64", "188", "296"]);
+            AddControlUI(ControlType.ListMenu, ["ColorList", "Classic", "64", "70"]);
+            AddControlUI(ControlType.ListMenu, ["FractalList", "Julia", "64", "240"]);
+
+            ResumeLayout(true);
+        }
+
+        private void SetupUI_Mandelbrot()
+        {
+            SuspendLayout();
+
+            Controls.Clear();
+
+            AddControlUI(ControlType.Fps);
+            AddControlUI(ControlType.FrameTime);
+            AddControlUI(ControlType.Iterations);
+            AddControlUI(ControlType.NPower);
+            AddControlUI(ControlType.Position, ["x", "138"]);
+            AddControlUI(ControlType.Position, ["y", "166"]);
+            AddControlUI(ControlType.Zoom);
+            AddControlUI(ControlType.RenderType, ["GPU32", "53", "296"]);
+            AddControlUI(ControlType.RenderType, ["GPU64", "188", "296"]);
+            AddControlUI(ControlType.ListMenu, ["ColorList", "Classic", "64", "70"]);
+            AddControlUI(ControlType.ListMenu, ["FractalList", "Julia", "64", "240"]);
+
+            ResumeLayout(true);
         }
 
         private void _iterationsControl_ValueChanged(object sender, EventArgs e)
         {
             _fractalWindow.SetIterations((int)_iterationsControl.Value);
         }
+        
+        private ContextMenuStrip SetupFractalMenu(Button dropdownList) {
+            ContextMenuStrip _fractalMenu = new ContextMenuStrip();
+            _fractalMenu.AutoSize = false;
+            _fractalMenu.Size = new Size(dropdownList.Width, 200);
 
-        private void SetupColorMenu()
+            var width = dropdownList.Width;
+
+            var fractals = new List<Button> {
+                        new Button { Text = "Mandelbrot"},
+                        new Button { Text = "Julia"},
+            };
+
+            foreach (var fractal in fractals)
+            {
+                ToolStripMenuItem item = new ToolStripMenuItem
+                {
+                    Text = fractal.Text,
+                    BackColor = Color.DimGray,
+                    ForeColor = Color.White,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    AutoSize = false,
+                    Width = width - 1,
+                    Height = 30,
+                };
+
+                var colour = item.BackColor;
+
+                item.MouseEnter += (s, e) => { colour = Color.FromArgb(Math.Min(colour.R + 20, 255), Math.Min(colour.G + 20, 255), Math.Min(colour.B + 20, 255)); };
+                item.MouseLeave += (s, e) => { colour = Color.FromArgb(Math.Max(colour.R - 20, 0), Math.Max(colour.G - 20, 0), Math.Max(colour.B - 20, 0)); };
+                item.Click += (s, e) =>
+                {
+                    dropdownList.Text = item.Text;
+                    _fractalWindow.changeFractal(item.Text);
+                    _fractalType = item.Text;
+                    BuildControlUI();
+                };
+                _fractalMenu.Items.Add(item);
+            }
+                return _fractalMenu;
+        }
+
+        private ContextMenuStrip SetupColorMenu(Button dropdownList)
         {
-            _colorMenu = new ContextMenuStrip();
+            ContextMenuStrip _colorMenu = new ContextMenuStrip();
             _colorMenu.AutoSize = false;
-            _colorMenu.Size = new Size(btnColorPick.Width, 200);
+            _colorMenu.Size = new Size(dropdownList.Width, 200);
 
-            var width = btnColorPick.Width;
+            var width = dropdownList.Width;
 
             var colors = new List<Button> {
                         new Button { Text = "Classic"},
@@ -517,11 +383,13 @@ namespace Mandelbrot
                 item.MouseLeave += (s, e) => { colour = Color.FromArgb(Math.Max(colour.R - 20, 0), Math.Max(colour.G - 20, 0), Math.Max(colour.B - 20, 0)); };
                 item.Click += (s, e) =>
                 {
-                    btnColorPick.Text = item.Text;
+                    dropdownList.Text = item.Text;
                     _fractalWindow.SetColorPalette(item.Text);
                 };
                 _colorMenu.Items.Add(item);
-            }   
+            }
+
+            return _colorMenu;
 
         }
 
@@ -531,6 +399,7 @@ namespace Mandelbrot
             {
                 e.Handled = true;
 
+                TextBox zoomInput = Controls.OfType<TextBox>().FirstOrDefault(tb => tb.Tag is ControlObjectAttributes attr && attr.Type == "Zoom");
                 if (float.TryParse(zoomInput.Text, out float _newZoom))
                 {
                     float value = sideLength / _newZoom;
@@ -538,12 +407,12 @@ namespace Mandelbrot
                     _fractalWindow.initialSideLength = value;
                 }
 
-                isEditingTextBox = false;
+                ((ControlObjectAttributes)zoomInput.Tag).IsEditable = false;
                 this.SelectNextControl((Control)sender, true, true, true, true);
             }
         }
 
-        private void _updateCenterPos(char axis, TextBox input, ref bool isEditingValue)
+        private void _updateCenterPos(char axis, TextBox input)
         {
 
             if (_fractalWindow.renderType == "GPU32")
@@ -564,7 +433,7 @@ namespace Mandelbrot
 
         }
 
-        private void BtnGPU32_CheckedChanged(object sender, EventArgs e)
+        private void btnGPU32_CheckedChanged(object sender, EventArgs e)
         {
             if (((RadioButton)sender).Checked)
             {
@@ -580,40 +449,252 @@ namespace Mandelbrot
             }
         }
 
-        private void btnLockPosX_Click(object sender, EventArgs e)
+        private void LockAxis(Button btnLock, TextBox posInput, string axis)
         {
-            if (btnLockPosX.BackgroundImage == unlockIMG)
+            if (btnLock.BackgroundImage == unlockIMG)
             {
-                btnLockPosX.BackgroundImage = lockIMG;
-                isEditingXPos = false;
-                xInput.Enabled = false;
-                _fractalWindow.LockCenterPos('x', true);
+                btnLock.BackgroundImage = lockIMG;
+                ((ControlObjectAttributes)posInput.Tag).IsEditable = false;
+                posInput.Enabled = false;
+                _fractalWindow.LockCenterPos(axis[0], true);
             }
             else
             {
-                btnLockPosX.BackgroundImage = unlockIMG;
-                isEditingXPos = true;
-                xInput.Enabled = true;
-                _fractalWindow.LockCenterPos('x', false);
+                btnLock.BackgroundImage = unlockIMG;
+                ((ControlObjectAttributes)posInput.Tag).IsEditable = true;
+                posInput.Enabled = true;
+                _fractalWindow.LockCenterPos(axis[0], false);
             }
         }
 
-        private void btnLockPosY_Click(object sender, EventArgs e)
-        {
-            if (btnLockPosY.BackgroundImage == unlockIMG)
-            {
-                btnLockPosY.BackgroundImage = lockIMG;
-                isEditingYPos = false;
-                yInput.Enabled = false;
-                _fractalWindow.LockCenterPos('y', true);
-            }
-            else
-            {
-                btnLockPosY.BackgroundImage = unlockIMG;
-                isEditingYPos = true;
-                yInput.Enabled = true;
-                _fractalWindow.LockCenterPos('y', false);
+        public void AddControlUI(ControlType type, string[] args = null) {
+
+            switch (type) { 
+                case ControlType.Fps:
+                    Label _fpsLabel = new Label();
+                    _fpsLabel.Tag = new ControlObjectAttributes { ID = "fps" };
+                    _fpsLabel.BorderStyle = BorderStyle.Fixed3D;
+                    _fpsLabel.Location = new Point(12, 9);
+                    _fpsLabel.Name = "_fpsLabel";
+                    _fpsLabel.Size = new Size(68, 22);
+                    _fpsLabel.TabIndex = 0;
+                    _fpsLabel.Text = "FPS:    ";
+                    _fpsLabel.TextAlign = ContentAlignment.TopCenter;
+                    Controls.Add(_fpsLabel);
+                    break;
+
+                case ControlType.FrameTime:
+                    Label _frameTimeLabel = new Label();
+                    _frameTimeLabel.Tag = new ControlObjectAttributes { ID = "frameTime" };
+                    _frameTimeLabel.BorderStyle = BorderStyle.Fixed3D;
+                    _frameTimeLabel.Location = new Point(188, 9);
+                    _frameTimeLabel.Name = "_frameTimeLabel";
+                    _frameTimeLabel.Size = new Size(160, 22);
+                    _frameTimeLabel.TabIndex = 1;
+                    _frameTimeLabel.Text = "FrameTime:       ";
+                    _frameTimeLabel.TextAlign = ContentAlignment.TopCenter;
+                    Controls.Add(_frameTimeLabel);
+                    break;
+
+                case ControlType.Iterations:
+                    Label _iterationsLabel = new Label();
+                    _iterationsLabel.Tag = new ControlObjectAttributes { ID = "iterations" };
+                    _iterationsLabel.AutoSize = true;
+                    _iterationsLabel.BorderStyle = BorderStyle.FixedSingle;
+                    _iterationsLabel.Location = new Point(13, 37);
+                    _iterationsLabel.Name = "_iterationsLabel";
+                    _iterationsLabel.Size = new Size(73, 22);
+                    _iterationsLabel.TabIndex = 3;
+                    _iterationsLabel.Text = "Iterations";
+
+                    _iterationsControl = new NumericUpDown();
+                    _iterationsControl.Increment = new decimal(new int[] { 16, 0, 0, 0 });
+                    _iterationsControl.Location = new Point(90, 37);
+                    _iterationsControl.Maximum = new decimal(new int[] { 65536, 0, 0, 0 });
+                    _iterationsControl.Value = _fractalWindow.MIterations;
+                    _iterationsControl.Name = "_iterationsControl";
+                    _iterationsControl.Size = new Size(81, 27);
+                    _iterationsControl.TabIndex = 5;
+                    _iterationsControl.TextAlign = HorizontalAlignment.Center;
+                    _iterationsControl.ValueChanged += _iterationsControl_ValueChanged;
+
+                    Controls.Add(_iterationsLabel);
+                    Controls.Add(_iterationsControl);
+                    break;
+
+                case ControlType.NPower:
+                    Label _nPowerLabel = new Label();
+                    _nPowerLabel.AutoSize = true;
+                    _nPowerLabel.BorderStyle = BorderStyle.FixedSingle;
+                    _nPowerLabel.Location = new Point(264, 37);
+                    _nPowerLabel.Name = "_nPowerLabel";
+                    _nPowerLabel.Size = new Size(84, 22);
+                    _nPowerLabel.TabIndex = 4;
+                    _nPowerLabel.Text = "Power(n): 2";
+
+                    Controls.Add(_nPowerLabel);
+                    break;
+
+                case ControlType.Position:
+
+                    TextBox posInput = new TextBox();
+                    posInput.Tag = new ControlObjectAttributes { IsEditable = false, Type = "Position", ID = args[0] };
+                    posInput.Location = new Point(85, int.Parse(args[1]));
+                    posInput.Name = $"{args[0]}Input";
+                    posInput.Size = new Size(238, 28);
+                    posInput.TabIndex = 10;
+                    posInput.GotFocus += (s, e) => { ((ControlObjectAttributes)posInput.Tag).IsEditable = true; };
+                    posInput.KeyPress += (s, e) => { if (e.KeyChar == '\r') { e.Handled = true; _updateCenterPos('x', posInput); } };
+                    posInput.Leave += (s, e) => { ((ControlObjectAttributes)posInput.Tag).IsEditable = false; };
+
+                    Label posLabel = new Label();
+                    posLabel.AutoSize = true;
+                    posLabel.Location = new Point(24, int.Parse(args[1]));
+                    posLabel.Name = $"{args[0]}ValueLabel";
+                    posLabel.Size = new Size(29, 28);
+                    posLabel.TabIndex = 9;
+                    posLabel.Text = $"{args[0].ToUpper()} : ";
+
+                    Button btnLockAxis = new Button();
+                    btnLockAxis.BackColor = Color.Transparent;
+                    btnLockAxis.BackgroundImageLayout = ImageLayout.Stretch;
+                    btnLockAxis.FlatAppearance.MouseDownBackColor = Color.Transparent;
+                    btnLockAxis.FlatAppearance.MouseOverBackColor = Color.Transparent;
+                    btnLockAxis.FlatStyle = FlatStyle.Flat;
+                    btnLockAxis.Location = new Point(53, int.Parse(args[1]));
+                    btnLockAxis.Name = $"btnLockAxis_{args[0]}";
+                    btnLockAxis.Size = new Size(26, 28);
+                    btnLockAxis.TabIndex = 17;
+                    btnLockAxis.UseVisualStyleBackColor = false;
+                    btnLockAxis.BackgroundImage = unlockIMG;
+                    btnLockAxis.Click += (s, e) => LockAxis(btnLockAxis, posInput, args[0]);
+                    btnLockAxis.MouseEnter += (s, e) => { btnLockAxis.FlatAppearance.MouseOverBackColor = Color.PaleTurquoise; };
+                    btnLockAxis.MouseLeave += (s, e) => { btnLockAxis.FlatAppearance.MouseDownBackColor = Color.Transparent; };
+
+                    Controls.Add(posInput);
+                    Controls.Add(posLabel);
+                    Controls.Add(btnLockAxis);
+                    break;
+
+                case ControlType.Zoom:
+
+                    Label zoomLabel = new Label();
+                    zoomLabel.AutoSize = true;
+                    zoomLabel.Location = new Point(12, 108);
+                    zoomLabel.Size = new Size(49, 20);
+                    zoomLabel.TabIndex = 8;
+                    zoomLabel.Text = "Zoom";
+
+                    TextBox zoomInput = new TextBox();
+                    zoomInput.Tag = new ControlObjectAttributes { IsEditable = false, Type = "Zoom" };
+                    zoomInput.Location = new Point(67, 105);
+                    zoomInput.Size = new Size(104, 27);
+                    zoomInput.TabIndex = 7;
+                    zoomInput.TextAlign = HorizontalAlignment.Center;
+
+                    zoomInput.GotFocus += (s, e) => { ((ControlObjectAttributes)zoomInput.Tag).IsEditable = true; };
+                    zoomInput.Validated += (s, e) => { ((ControlObjectAttributes)zoomInput.Tag).IsEditable = false; };
+                    zoomInput.KeyPress += _zoomFactorUpdated;
+
+                    Controls.Add(zoomLabel);
+                    Controls.Add(zoomInput);
+                    break;
+
+                case ControlType.RenderType:
+                    RadioButton btnSelector = new RadioButton();
+
+                    btnSelector.AutoSize = true;
+                    btnSelector.CheckAlign = ContentAlignment.MiddleRight;
+                    btnSelector.Checked = (args[0] == _fractalWindow.renderType) ? true : false;
+                    btnSelector.Location = new Point(int.Parse(args[1]), int.Parse(args[2]));
+                    btnSelector.Size = new Size(74, 24);
+                    btnSelector.Name = $"btn{args[0]}";
+                    btnSelector.TabIndex = 12;
+                    btnSelector.TabStop = true;
+                    btnSelector.Text = args[0];
+                    btnSelector.TextAlign = ContentAlignment.TopCenter;
+                    btnSelector.UseVisualStyleBackColor = true;
+
+                    switch (args[0]) {
+                        case "GPU32": btnSelector.CheckedChanged += btnGPU32_CheckedChanged; break;
+                        case "GPU64": btnSelector.CheckedChanged += btnGPU64_CheckedChanged; break;
+                    }
+
+                    Controls.Add(btnSelector);
+                    break;
+
+                case ControlType.ListMenu:
+
+                    Button dropdownList = new Button();
+                    dropdownList.Location = new Point(int.Parse(args[2]), int.Parse(args[3]));
+                    dropdownList.Size = new Size(259, 29);
+                    dropdownList.TabIndex = 20;
+                    dropdownList.Text = args[1];
+                    dropdownList.UseVisualStyleBackColor = true;
+
+                    switch (args[0]) {
+                        case "ColorList": {
+                                var list = SetupColorMenu(dropdownList);
+                                dropdownList.Tag = new ControlObjectAttributes { ChildElement = list};
+                                dropdownList.Click += (s, e) =>
+                                {
+                                    if (((ControlObjectAttributes)dropdownList.Tag).ChildElement is ToolStripDropDown attachedMenu)
+                                    {
+                                        if (attachedMenu.Visible)
+                                        {
+                                            attachedMenu.Close();
+                                        }
+                                        else
+                                        {
+                                            attachedMenu.Show(dropdownList, new Point(0, dropdownList.Height));
+                                        }
+                                    }
+                                };
+                            } break;
+
+                        case "FractalList":
+                            {
+                                var list = SetupFractalMenu(dropdownList);
+                                dropdownList.Tag = new ControlObjectAttributes { ChildElement = list };
+                                dropdownList.Click += (s, e) =>
+                                {
+                                    if (((ControlObjectAttributes)dropdownList.Tag).ChildElement is ToolStripDropDown attachedMenu)
+                                    {
+                                        if (attachedMenu.Visible)
+                                        {
+                                            attachedMenu.Close();
+                                        }
+                                        else
+                                        {
+                                            attachedMenu.Show(dropdownList, new Point(0, dropdownList.Height));
+                                        }
+                                    }
+                                };
+                            }
+                            break;
+                    }
+
+                    Controls.Add(dropdownList);
+                    break;
             }
         }
+    }
+
+    public enum ControlType { 
+        Fps,
+        FrameTime,
+        Iterations,
+        NPower,
+        Zoom,
+        Position,
+        RenderType,
+        ListMenu
+    }
+
+    public class ControlObjectAttributes {
+        public bool IsEditable { get; set; }
+        public string Type { get; set; }
+        public string ID { get; set; }
+        public object ChildElement { get; set; }
     }
 }

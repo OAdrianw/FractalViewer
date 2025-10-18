@@ -22,6 +22,7 @@ namespace Mandelbrot
         private Renderer _renderer;
         private ConcurrentQueue<string> _shaderCommandQueue = new ConcurrentQueue<string>();
         private ConcurrentQueue<string> _fractalPaletteQueue = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> _fractalTypeQueue = new ConcurrentQueue<string>();
 
         private double _timeSinceLastFpsUpdate = 0.0;
         private int _frameCount = 0;
@@ -41,6 +42,7 @@ namespace Mandelbrot
 
         int canvasWidth = 640, canvasHeight = 480;
         public string renderType = "GPU32";
+        public string _fractalType = "Julia";
         private string previousRenderType = "GPU32";
 
 
@@ -58,6 +60,7 @@ namespace Mandelbrot
         public float target_SideLength;
         public Vector2 target_Center;
         public Vector2 rectanglePosBegin, rectanglePosEnd;
+        public Vector2 mPos;
 
 
         public double initialSideLengthPD = 3.4d;
@@ -65,6 +68,7 @@ namespace Mandelbrot
         public double target_SideLengthPD;
         public Vector2d target_CenterPD;
         public Vector2 rectanglePosBeginPD, rectanglePosEndPD;
+        public Vector2d mPosPD;
 
         public Vector2i target_Location;
         public Vector2i target_Size;
@@ -80,13 +84,13 @@ namespace Mandelbrot
         public Program(NativeWindowSettings nativeWindowSettings)
           : base(GameWindowSettings.Default, nativeWindowSettings)
         {
-
+            mPos = new Vector2(0, 0);
             target_Location = Location;
             target_Size = Size;
             target_SideLength = initialSideLength;
             target_SideLengthPD = initialSideLengthPD;
 
-            _renderer = new Renderer(renderType);
+            _renderer = new Renderer(renderType, _fractalType);
 
             _inputHandler = new InputHandler(
                       (cursor) => Cursor = cursor,
@@ -101,6 +105,7 @@ namespace Mandelbrot
             _inputHandler.MouseWheel += OnMouseWheel;
             _inputHandler.KeyDown += OnKeyDown;
             _inputHandler.KeyUp += OnKeyUp;
+            _inputHandler.requestMousePosition += getMousePos;
             _inputHandler.requestPanning += HandlePan;
             _inputHandler.requestZooming += HandleZoom;
             _inputHandler.requestWindowDragging += HandleWindowDrag;
@@ -114,8 +119,12 @@ namespace Mandelbrot
             canvasHeight = nativeWindowSettings.ClientSize.Y;
 
             nativeWindowSettings.Location = new Vector2i(StartX, StartY);
-            _shaderCommandQueue.Enqueue("GPU32");
+
+            _fractalTypeQueue.Enqueue(_fractalType);
             _fractalPaletteQueue.Enqueue("Classic");
+            _shaderCommandQueue.Enqueue("GPU32");
+
+            
         }
 
 
@@ -153,6 +162,56 @@ namespace Mandelbrot
             _shaderCommandQueue.Enqueue(newRendererType);
         }
 
+        public void changeFractal(string newFractalType)
+        {
+            _fractalTypeQueue.Enqueue(newFractalType);
+        }
+
+        private void getMousePos(Vector2 pos)
+        {
+            if (renderType == "GPU32")
+            {
+                float aspectRatio = (float)canvasWidth / canvasHeight;
+
+                float normX = pos.X / canvasWidth;
+                float normY = pos.Y / canvasHeight;
+
+                // Calculate view bounds
+                float halfSide = initialSideLength / 2.0f;
+                float minX = currentCenter.X - halfSide * aspectRatio;
+                float maxX = currentCenter.X + halfSide * aspectRatio;
+                float minY = currentCenter.Y - halfSide;
+                float maxY = currentCenter.Y + halfSide;
+
+                // Map to fractal coordinates
+                mPos.X = minX + normX * (maxX - minX);
+                mPos.Y = maxY - normY * (maxY - minY);
+            }
+            else if (renderType == "GPU64")
+            {
+                double aspectRatio = (double)canvasWidth / canvasHeight;
+
+                double normX = pos.X / canvasWidth;
+                double normY = pos.Y / canvasHeight;
+
+                // Calculate view bounds
+                double halfSide = initialSideLengthPD / 2.0f;
+                double minX = currentCenterPD.X - halfSide * aspectRatio;
+                double maxX = currentCenterPD.X + halfSide * aspectRatio;
+                double minY = currentCenterPD.Y - halfSide;
+                double maxY = currentCenterPD.Y + halfSide;
+
+                // Map to fractal coordinates
+                mPosPD.X = minX + normX * (maxX - minX);
+                mPosPD.Y = maxY - normY * (maxY - minY);
+            }
+        }
+
+        public void LockMousePosition(bool lockState)
+        {
+            _inputHandler.lockMousePos = lockState;
+        }
+
         public void LockCenterPos(char axis, bool lockState)
         {
             if (axis == 'x')
@@ -171,7 +230,6 @@ namespace Mandelbrot
 
             _renderer.OnLoad();
         }
-
 
         private void HandlePan(Vector2 pixelDelta)
         {
@@ -338,6 +396,7 @@ namespace Mandelbrot
                     initialSideLength = (float)initialSideLengthPD;
                     target_Center = currentCenter;
                     target_SideLength = initialSideLength;
+                    mPos = new Vector2((float)mPosPD.X, (float)mPosPD.Y);
                 }
                 else if (command == "GPU64" && previousRenderType == "GPU32")
                 {
@@ -345,6 +404,7 @@ namespace Mandelbrot
                     initialSideLengthPD = initialSideLength;
                     target_CenterPD = currentCenterPD;
                     target_SideLengthPD = initialSideLengthPD;
+                    mPosPD = new Vector2d(mPos.X, mPos.Y);
                 }
 
                 renderType = command;
@@ -359,22 +419,30 @@ namespace Mandelbrot
                 previousRenderType = renderType;
             }
 
+            while (_fractalTypeQueue.TryDequeue(out string selected_fractal))
+            {
+                _renderer.SetFractalType(selected_fractal, this.Context);
+                _renderer.NPower = NPower;
+            }
+
             while (_fractalPaletteQueue.TryDequeue(out string paletteName))
             {
                 _renderer.SetPalette(paletteName);
                 Console.WriteLine($"Switched to {paletteName} palette.");
             }
-
+          
             _renderer.MIterations = MIterations;
             if (renderType == "GPU32")
             {
                 _renderer.Center = currentCenter;
                 _renderer.SideLength = initialSideLength;
+                _renderer.mPos = mPos;
             }
             else if (renderType == "GPU64")
             {
                 _renderer.CenterPD = currentCenterPD;
                 _renderer.SideLengthPD = initialSideLengthPD;
+                _renderer.mPosPD = mPosPD;
             }
 
             _renderer.Render(Size);

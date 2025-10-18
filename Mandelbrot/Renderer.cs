@@ -39,11 +39,14 @@ namespace Mandelbrot
         public int StartX { get; set; } = 0;
         public int StartY { get; set; } = 0;
 
+        public Vector2 mPos;
+        public Vector2d mPosPD;
         private float aspectRatio;
         private float halfSideLength;
         private double halfSideLengthPD;
         public float borderWidthPx = 3.0f;
         private string renderType;
+        private string fractalType;
 
         private readonly float[] _vertices = {
             -1.0f, -1.0f, // Top Right
@@ -52,9 +55,11 @@ namespace Mandelbrot
              1.0f, 1.0f  // Top Left
         };
 
-        public Renderer(string type = "GPU32")
+        public Renderer(string type = "GPU32", string fractal = "Mandelbrot")
         {
             renderType = type;
+            fractalType = fractal;
+
             InitializePalettes();
         }
 
@@ -154,6 +159,7 @@ namespace Mandelbrot
             _palettes.Add("Grayscale", grayscale);
 
         }
+
         public void SetRenderType(string type, IGLFWGraphicsContext context, Vector2i Size)
         {
             context.MakeCurrent(); 
@@ -176,7 +182,46 @@ namespace Mandelbrot
             }
         }
 
+        public void SetFractalType(string fractal, IGLFWGraphicsContext context) {
+            context.MakeCurrent();
+            fractalType = fractal;
 
+            try
+            {
+
+                _shader32?.Dispose();
+                _shader64?.Dispose();
+
+                SetShaders();
+
+                _activeShader = renderType == "GPU32" ? _shader32 : _shader64;
+                _activeShader.Use();
+
+                calcCoordinates();
+                _activeShader.SetFloat("N_POWER", NPower);
+                _activeShader.SetFloat("MAX_ITERATIONS", MIterations);
+                colorFractal();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to switch shader: {ex.Message}");
+                throw;
+            }
+        }
+
+        public void SetShaders() {
+            switch (fractalType)
+            {
+                case "Mandelbrot":
+                    _shader32 = new Shader("Shaders/bidimensional.vert", "Shaders/mandelbrot32.frag");
+                    _shader64 = new Shader("Shaders/bidimensional.vert", "Shaders/mandelbrot64.frag");
+                    break;
+                case "Julia":
+                    _shader32 = new Shader("Shaders/bidimensional.vert", "Shaders/julia32.frag");
+                    _shader64 = new Shader("Shaders/bidimensional.vert", "Shaders/julia64.frag");
+                    break;
+            }
+        }
 
         public void OnLoad()
         {
@@ -196,12 +241,10 @@ namespace Mandelbrot
 
             colors = _palettes[_currentPaletteName].getColorsNorm();
 
-
-            _shader32 = new Shader("Shaders/mandelbrot.vert", "Shaders/mandelbrot32.frag");
-            _shader64 = new Shader("Shaders/mandelbrot.vert", "Shaders/mandelbrot64.frag");
+            SetShaders();
+            
             _activeShader = renderType == "GPU32" ? _shader32 : _shader64;
             _activeShader.Use();
-
         }
 
         public void Render(Vector2 Size) {
@@ -213,10 +256,11 @@ namespace Mandelbrot
 
             if (renderType == "GPU32") {
                 halfSideLength = SideLength / 2.0f;
+                _activeShader.SetVector2("mousePos", mPos);
             }
             else if (renderType == "GPU64") {
-
                 halfSideLengthPD = SideLengthPD / 2.0d;
+                _activeShader.SetVector2d("mousePos", mPosPD);
             }
 
             _activeShader.SetFloat("N_POWER", NPower);

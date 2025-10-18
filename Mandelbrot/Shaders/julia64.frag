@@ -3,10 +3,10 @@
 in vec3 vPos; 
 out vec4 FragColor;
 
-uniform float minx;
-uniform float maxx;
-uniform float miny;
-uniform float maxy;
+uniform double minx;
+uniform double maxx;
+uniform double miny;
+uniform double maxy;
 
 uniform float MAX_ITERATIONS;
 uniform float N_POWER;
@@ -15,15 +15,18 @@ uniform vec3 palette[10];
 uniform int palette_size;
 
 uniform vec2 beginRect;     
-uniform vec2 endRect;       
+uniform vec2 endRect; 
+uniform dvec2 mousePos;
 uniform float drawRectangle; // 1.0 if rectangle should be drawn, 0.0 otherwise
 uniform float u_borderWidth;
 
-float iterateMandelbrot_naive(vec2 coord) {
-    vec2 z = vec2(0.0);
-    vec2 c = coord;
+
+
+float iterateMandelbrot_naive(dvec2 coord) {
+    dvec2 z = coord;
+    dvec2 c = mousePos;
     
-    float tempZ = z.x;
+    double tempZ = z.x;
     float count = 0.0;
 
     do {
@@ -36,25 +39,6 @@ float iterateMandelbrot_naive(vec2 coord) {
 
     return count;
 }
-
-float iterateMandelbrot_optimized(vec2 p0) {
-    vec2 p = vec2(0.0);
-    vec2 p2 = vec2(0.0);
-    
-    float count = 0.0;
-
-    do {
-        p.y = ((p.x + p.x) * p.y) + p0.y;
-        p.x = p2.x - p2.y + p0.x;
-        p2.x = p.x * p.x;
-        p2.y = p.y * p.y;
-
-        count += 1.0;
-    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
-
-    return count;
-}
-
 
 
 vec4 drawSelection() {
@@ -120,15 +104,15 @@ vec4 colorFractal(float count) {
 
 void main(){
 
-    float x_interp = (vPos.x + 1.0) / 2.0; 
-    float y_interp = (vPos.y + 1.0) / 2.0; 
+    double x_interp = (vPos.x + 1.0) / 2.0; 
+    double y_interp = (vPos.y + 1.0) / 2.0; 
 
-    float x_coord  = mix(minx, maxx, x_interp);
-    float y_coord  = mix(miny, maxy, y_interp);
+    double x_coord  = mix(minx, maxx, x_interp);
+    double y_coord  = mix(miny, maxy, y_interp);
 
-    vec2 coord = vec2(x_coord, y_coord);
+    dvec2 coord = dvec2(x_coord, y_coord);
 
-    float i = iterateMandelbrot_optimized(coord);
+    float i = iterateMandelbrot_naive(coord);
     vec4 color;
 
     color = colorFractal(i);

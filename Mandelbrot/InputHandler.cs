@@ -27,6 +27,7 @@ namespace Mandelbrot
 
         public event Action<bool> selectRectangle;
         public event Action<Vector2, Vector2> rectanglePositionUpdated;
+        public event Action<Vector2> requestMousePosition;
         public event Action ApplyRectangleSelection;
         public event Action<Vector2> requestPanning;
         public event Action<float, Vector2> requestZooming;
@@ -41,6 +42,7 @@ namespace Mandelbrot
         public bool _isResizingWindow;
         public bool _kSpacePressed, _ctrlSelected;
         public bool _isResizeLeft, _isResizeRight, _isResizeTop, _isResizeBottom;
+        public bool lockMousePos = false;
         public int _resizeBorderThickness = 25;
 
         public Vector4 canvasArea;
@@ -158,7 +160,7 @@ namespace Mandelbrot
                 Vector2 pixelDelta = mousePos - _lastMousePos;
 
                 requestPanning?.Invoke(pixelDelta);
-                
+
                 _lastMousePos = mousePos;
 
             }
@@ -199,6 +201,12 @@ namespace Mandelbrot
                 _selectEnd = mousePos;
                 rectanglePositionUpdated?.Invoke(_selectStart, _selectEnd);
             }
+            else {
+
+                if (!lockMousePos) { 
+                    requestMousePosition?.Invoke(mousePos);
+                }
+            }
 
         }
 
@@ -235,6 +243,9 @@ namespace Mandelbrot
             {
                 _ctrlSelected = false;
                 _setCursor(_previousCursor);
+            } else if (e.Key == Keys.M) {
+
+                lockMousePos = !lockMousePos;
             }
         }
 

@@ -120,6 +120,15 @@ namespace Mandelbrot
         }
 
         /// <summary>
+        /// Sets a Vector2d uniform variable in the shader program.
+        /// </summary>
+        public void SetVector2d(string name, Vector2d value) 
+        { 
+            int location = GL.GetUniformLocation(Handle, name);
+            GL.Uniform2(location, value.X, value.Y);
+        }
+
+        /// <summary>
         /// Sets a Vector3 uniform variable in the shader program.
         /// </summary>
         public void SetVector3(string name, Vector3 value)
