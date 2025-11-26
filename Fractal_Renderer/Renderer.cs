@@ -211,15 +211,16 @@ namespace Fractal_Renderer
         }
 
         public void SetShaders() {
+
             switch (fractalType)
             {
                 case "Mandelbrot":
-                    _shader32 = new Shader("Shaders/bidimensional.vert", "Shaders/mandelbrot32.frag");
-                    _shader64 = new Shader("Shaders/bidimensional.vert", "Shaders/mandelbrot64.frag");
+                    _shader32 = new Shader("Mandelbrot", "GPU32");
+                    _shader64 = new Shader("Mandelbrot", "GPU64");
                     break;
                 case "Julia":
-                    _shader32 = new Shader("Shaders/bidimensional.vert", "Shaders/julia32.frag");
-                    _shader64 = new Shader("Shaders/bidimensional.vert", "Shaders/julia64.frag");
+                    _shader32 = new Shader("Julia", "GPU32");
+                    _shader64 = new Shader("Julia", "GPU64");
                     break;
             }
         }

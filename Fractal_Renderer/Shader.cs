@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reflection.Metadata;
 
 namespace Fractal_Renderer
 {
@@ -12,9 +13,14 @@ namespace Fractal_Renderer
     {
         public int Handle { get; private set; }
 
-        public Shader(string vertexPath, string fragmentPath)
+        public Shader(string fractalType, string rendererType)
         {
-          
+            Console.WriteLine("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+            string[] shader;
+            shader = ComposeShader(fractalType, rendererType);
+            string vertexPath = shader[0];
+            string fragmentPath = shader[1];
+
             string vertexShaderSource = File.ReadAllText(vertexPath);
             string fragmentShaderSource = File.ReadAllText(fragmentPath);
 
@@ -160,6 +166,73 @@ namespace Fractal_Renderer
             }
 
             GL.Uniform3(location, length, floatArray);
+        }
+
+        private string[] ComposeShader(string fractalType, string renderType) {
+            Console.WriteLine($"Current Working Directory: {Directory.GetCurrentDirectory()}");
+            string frag = $"Shaders/{fractalType}{renderType}Shader.frag";
+
+            File.WriteAllText(frag, string.Empty);
+
+            Encoding encoding = Encoding.UTF8;
+
+            string variablesPath = "Shaders/variables.txt";
+            string extraPath = "Shaders/extra.txt";
+            string coloringPath = "Shaders/coloring.txt";
+            string fractal_core_path = string.Empty;
+            string fractal_main = string.Empty;
+
+            string variables = File.ReadAllText(variablesPath, encoding);
+
+            if (renderType == "GPU32")
+            {
+                variables += "\nuniform float minx;\nuniform float maxx;\nuniform float miny;\nuniform float maxy;\n";
+                if (fractalType == "Julia") variables += "uniform vec2 mousePos;";
+            }
+            else {
+                variables += "\nuniform double minx;\nuniform double maxx;\nuniform double miny;\nuniform double maxy;\n";
+                if (fractalType == "Julia") variables += "uniform dvec2 mousePos;";
+            }
+            string extra = File.ReadAllText(extraPath, encoding);
+            string coloring = File.ReadAllText(coloringPath);
+
+            if (fractalType == "Mandelbrot")
+            {
+                fractal_core_path = "Shaders/Mandelbrot.txt";
+            }
+            else if (fractalType == "Julia") {
+                fractal_core_path = "Shaders/Julia.txt";
+            }
+            string fractal_core = File.ReadAllText(fractal_core_path, encoding);
+
+            fractal_main += "void main() {\n"
+                              + ((renderType == "GPU32") ?
+                              "    float x_interp = (vPos.x + 1.0) / 2.0; \n" +
+                              "    float y_interp = (vPos.y + 1.0) / 2.0; \n" +
+                              "    float x_coord  = mix(minx, maxx, x_interp); \n" +
+                              "    float y_coord  = mix(miny, maxy, y_interp); \n" +
+                              "    vec2 coord = vec2(x_coord, y_coord);\n" +
+                              "    vec2 u_center = vec2((minx + maxx) / 2.0, (miny + maxy) / 2.0);\n" :
+
+                              "    double x_interp = (vPos.x + 1.0) / 2.0;\n    " +
+                              "    double y_interp = (vPos.y + 1.0) / 2.0;\n    " +
+                              "    double x_coord  = mix(minx, maxx, x_interp);\n    " +
+                              "    double y_coord  = mix(miny, maxy, y_interp); \n" +
+                              "    dvec2 coord = dvec2(x_coord, y_coord);\n" +
+                              "    dvec2 u_center = dvec2((minx + maxx) / 2.0, (miny + maxy) / 2.0);\n") +
+
+                              "    coord = applyRotation(coord, u_center, rotation_angle);\n" +
+                              "    float i = " + "iterate" + fractalType + renderType + "_optimized(coord);\n" +
+                              "    vec4 color;\n" +
+                              "    color = colorFractal(i);\n" +
+                              "    color += drawSelection();\n"+
+                              "    FragColor = color;\n"
+                              + "}\n";
+
+            string finalFragmentSource = variables + extra + coloring + fractal_core + fractal_main;
+            File.WriteAllText(frag, finalFragmentSource, encoding);
+
+            return new string[] { "Shaders/bidimensional.vert", frag};
         }
     }
 }

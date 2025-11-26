@@ -1,0 +1,71 @@
+﻿float iterateMandelbrotGPU64_naive(dvec2 coord) {
+    dvec2 z = dvec2(0.0);
+    dvec2 c = coord;
+    
+    double tempZ = z.x;
+    float count = 0.0;
+
+    do {
+        tempZ = z.x * z.x - z.y * z.y + c.x;
+        z.y = 2.0 * z.x * z.y + c.y;
+        z.x = tempZ;
+
+        count += 1.0;
+    } while ((z.x*z.x + z.y*z.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateMandelbrotGPU64_optimized(dvec2 p0) {
+    dvec2 p = dvec2(0.0);
+    dvec2 p2 = dvec2(0.0);
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + p0.y;
+        p.x = p2.x - p2.y + p0.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateMandelbrotGPU32_naive(vec2 coord) {
+    vec2 z = vec2(0.0);
+    vec2 c = coord;
+    
+    float tempZ = z.x;
+    float count = 0.0;
+
+    do {
+        tempZ = z.x * z.x - z.y * z.y + c.x;
+        z.y = 2.0 * z.x * z.y + c.y;
+        z.x = tempZ;
+
+        count += 1.0;
+    } while ((z.x*z.x + z.y*z.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateMandelbrotGPU32_optimized(vec2 p0) {
+    vec2 p = vec2(0.0);
+    vec2 p2 = vec2(0.0);
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + p0.y;
+        p.x = p2.x - p2.y + p0.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}

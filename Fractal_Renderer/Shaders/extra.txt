@@ -1,0 +1,60 @@
+﻿vec4 drawSelection() {
+
+    if (drawRectangle > 0.5) { 
+
+        vec2 rectMin = min(beginRect, endRect);
+        vec2 rectMax = max(beginRect, endRect);
+
+        bool isInsideRect = vPos.x >= rectMin.x && vPos.x <= rectMax.x &&
+                            vPos.y >= rectMin.y && vPos.y <= rectMax.y;
+
+
+        bool onBorder = false;
+        if (isInsideRect) { 
+
+            bool nearLeft = abs(vPos.x - rectMin.x) < u_borderWidth;
+            bool nearRight = abs(vPos.x - rectMax.x) < u_borderWidth;
+            bool nearBottom = abs(vPos.y - rectMin.y) < u_borderWidth;
+            bool nearTop = abs(vPos.y - rectMax.y) < u_borderWidth;
+
+            onBorder = (nearLeft || nearRight || nearBottom || nearTop);
+        }
+
+        if (onBorder) {
+            return vec4(1.0, 0.0, 0.0, 1.0); // Border color
+        } else {
+            return vec4(0.0); // Fractal color behind border 
+        }
+
+    } else {
+        return vec4(0.0); // No selection
+    }
+
+}
+
+float convertToRad(float degrees) {
+    return degrees * (pi / 180.0);
+}
+
+vec2 applyRotation(vec2 point, vec2 center, float angleDegrees) {
+
+    vec2 r;
+    float angleRad = convertToRad(angleDegrees);
+
+    vec2 t = point - center;
+    r.x = t.x * cos(angleRad) - t.y * sin(angleRad);
+    r.y = t.x * sin(angleRad) + t.y * cos(angleRad);
+    r += center;
+
+    return r;
+}
+
+dvec2 applyRotation(dvec2 point, dvec2 center, float angleDegrees) {
+    dvec2 r;
+    float angleRad = convertToRad(angleDegrees);
+    dvec2 t = point - center;
+    r.x = t.x * double(cos(angleRad)) - t.y * double(sin(angleRad));
+    r.y = t.x * double(sin(angleRad)) + t.y * double(cos(angleRad));
+    r += center;
+    return r;
+}

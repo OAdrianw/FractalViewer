@@ -15,13 +15,8 @@
     <PackageReference Include="OpenTK.Windowing.Desktop" Version="4.9.4" />
   </ItemGroup>
 
-  <ItemGroup>
-	  <None Update="Shaders\*.vert">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="Shaders\*.frag">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="Shaders\*" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
 
 </Project>

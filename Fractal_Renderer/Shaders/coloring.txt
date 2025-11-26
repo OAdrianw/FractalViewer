@@ -1,0 +1,26 @@
+﻿vec4 colorFractal(float count) {
+    if (count == MAX_ITERATIONS) {
+        return vec4(0.0, 0.0, 0.0, 1.0); // Inside the fractal
+    } else {
+        // Map the count to palette space
+
+        if (palette_size <= 0) {
+            return vec4(1.0, 0.0, 1.0, 1.0); // Magenta = error indicator
+        }
+
+        float palettePos = count * float(palette_size - 1) / MAX_ITERATIONS;
+        
+        // Get the two adjacent palette indices (with wrapping)
+        int idx1 = int(floor(palettePos)) % palette_size;
+        int idx2 = (idx1 + 1) % palette_size;
+        
+        // Get the fractional part for smooth interpolation
+        float t = fract(palettePos);
+        
+        vec3 color1 = palette[idx1];
+        vec3 color2 = palette[idx2];
+        vec3 color = mix(color1, color2, t);
+
+        return vec4(color, 1.0);
+    }
+}

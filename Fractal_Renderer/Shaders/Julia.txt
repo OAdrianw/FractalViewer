@@ -1,0 +1,71 @@
+﻿float iterateJuliaGPU64_naive(dvec2 coord) {
+    dvec2 z = coord;
+    dvec2 c = mousePos;
+    
+    double tempZ = z.x;
+    float count = 0.0;
+
+    do {
+        tempZ = z.x * z.x - z.y * z.y + c.x;
+        z.y = 2.0 * z.x * z.y + c.y;
+        z.x = tempZ;
+
+        count += 1.0;
+    } while ((z.x*z.x + z.y*z.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateJuliaGPU64_optimized(dvec2 p0){
+    dvec2 p = p0;
+    dvec2 p2 = p * p;
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + mousePos.y;
+        p.x = p2.x - p2.y + mousePos.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateJuliaGPU32_naive(vec2 coord) {
+    vec2 z = coord;
+    vec2 c = mousePos;
+
+    float tempZ = z.x;
+    float count = 0.0;
+
+    do {
+        tempZ = z.x * z.x - z.y * z.y + c.x;
+        z.y = 2.0 * z.x * z.y + c.y;
+        z.x = tempZ;
+
+        count += 1.0;
+    } while ((z.x*z.x + z.y*z.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateJuliaGPU32_optimized(vec2 p0){
+    vec2 p = p0;
+    vec2 p2 = p * p;
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + mousePos.y;
+        p.x = p2.x - p2.y + mousePos.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
