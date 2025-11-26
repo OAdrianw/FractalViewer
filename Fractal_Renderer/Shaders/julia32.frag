@@ -1,4 +1,5 @@
 ﻿#version 460 core
+#define pi 3.1415
 
 in vec3 vPos; 
 out vec4 FragColor;
@@ -10,6 +11,7 @@ uniform float maxy;
 
 uniform float MAX_ITERATIONS;
 uniform float N_POWER;
+uniform float rotation_angle;
 
 uniform vec3 palette[10];
 uniform int palette_size;
@@ -35,6 +37,24 @@ float iterateJulia_naive(vec2 coord) {
 
         count += 1.0;
     } while ((z.x*z.x + z.y*z.y) <= 4 && count < MAX_ITERATIONS);
+
+    return count;
+}
+
+float iterateJulia_optimized(vec2 p0){
+    vec2 p = p0;
+    vec2 p2 = p * p;
+    
+    float count = 0.0;
+
+    do {
+        p.y = ((p.x + p.x) * p.y) + mousePos.y;
+        p.x = p2.x - p2.y + mousePos.x;
+        p2.x = p.x * p.x;
+        p2.y = p.y * p.y;
+
+        count += 1.0;
+    } while ((p2.x + p2.y) <= 4 && count < MAX_ITERATIONS);
 
     return count;
 }
@@ -100,6 +120,23 @@ vec4 colorFractal(float count) {
     }
 }
 
+float convertToRad(float degrees) {
+    return degrees * (pi / 180.0);
+}
+
+vec2 applyRotation(vec2 point, vec2 center, float angleDegrees) {
+
+    vec2 r;
+    float angleRad = convertToRad(angleDegrees);
+
+    vec2 t = point - center;
+    r.x = t.x * cos(angleRad) - t.y * sin(angleRad);
+    r.y = t.x * sin(angleRad) + t.y * cos(angleRad);
+    r += center;
+
+    return r;
+}
+
 void main(){
 
     float x_interp = (vPos.x + 1.0) / 2.0; 
@@ -109,8 +146,11 @@ void main(){
     float y_coord  = mix(miny, maxy, y_interp);
 
     vec2 coord = vec2(x_coord, y_coord);
+    vec2 u_center = vec2((minx + maxx) / 2.0, (miny + maxy) / 2.0);
+    
+    coord = applyRotation(coord, u_center, rotation_angle);
 
-    float i = iterateJulia_naive(coord);
+    float i = iterateJulia_optimized(coord);
     vec4 color;
 
     color = colorFractal(i);

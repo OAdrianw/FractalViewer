@@ -5,7 +5,7 @@ using OTK = OpenTK.Windowing.GraphicsLibraryFramework;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
 
-namespace Mandelbrot
+namespace Fractal_Renderer
 {
 
     public delegate void SetCursorDelegate(MouseCursor cursor);
@@ -27,7 +27,7 @@ namespace Mandelbrot
 
         public event Action<bool> selectRectangle;
         public event Action<Vector2, Vector2> rectanglePositionUpdated;
-        public event Action<Vector2> requestMousePosition;
+        public event Action<Vector2, Vector2> requestMousePosition;
         public event Action ApplyRectangleSelection;
         public event Action<Vector2> requestPanning;
         public event Action<float, Vector2> requestZooming;
@@ -93,6 +93,8 @@ namespace Mandelbrot
 
         public void Handle_MouseDown(MouseButtonEventArgs e, Vector2 mousePos, Vector2i Size, Vector2i Location) {
 
+            _lastMousePos = mousePos;
+
             if (e.Button == MouseButton.Left)
             {
 
@@ -136,14 +138,18 @@ namespace Mandelbrot
                 else 
                 {
                     _isFractalPanning = true;
-                    _lastMousePos = mousePos; 
                     _setCursor(MouseCursor.PointingHand); 
                 }
             }
         }
 
         public void Handle_MouseMove(MouseMoveEventArgs e, Vector2 mousePos, Vector2i Size) {
-            
+
+            Vector2 pixelDelta = mousePos - _lastMousePos;
+            _lastMousePos = mousePos;
+
+            requestMousePosition?.Invoke(mousePos, pixelDelta);
+
             if (_isWindowDragging)
             {
 
@@ -156,13 +162,7 @@ namespace Mandelbrot
             }
             else if (_isFractalPanning && !_ctrlSelected)
             {
-
-                Vector2 pixelDelta = mousePos - _lastMousePos;
-
                 requestPanning?.Invoke(pixelDelta);
-
-                _lastMousePos = mousePos;
-
             }
             else if (_isResizingWindow)
             {
@@ -201,12 +201,6 @@ namespace Mandelbrot
                 _selectEnd = mousePos;
                 rectanglePositionUpdated?.Invoke(_selectStart, _selectEnd);
             }
-            else {
-
-                if (!lockMousePos) { 
-                    requestMousePosition?.Invoke(mousePos);
-                }
-            }
 
         }
 
@@ -243,10 +237,7 @@ namespace Mandelbrot
             {
                 _ctrlSelected = false;
                 _setCursor(_previousCursor);
-            } else if (e.Key == Keys.M) {
-
-                lockMousePos = !lockMousePos;
-            }
+            } 
         }
 
         public void UpdateCursor(Vector2 mousePos, Vector2i Size)

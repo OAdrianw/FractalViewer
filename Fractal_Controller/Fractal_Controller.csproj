@@ -9,33 +9,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Mandelbrot\**" />
-    <EmbeddedResource Remove="Mandelbrot\**" />
-    <None Remove="Mandelbrot\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="Assets\lock.png" />
-    <None Remove="Assets\unlock.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Assets\lock.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Assets\unlock.png">
+    <Content Include="Assets\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
 
 	<ItemGroup>
+	  <PackageReference Include="MouseKeyHook" Version="5.7.1" />
 	  <PackageReference Include="OpenTK.GLControl" Version="4.0.2" />
 	</ItemGroup>
 
 
 	<ItemGroup>
-	  <ProjectReference Include="Mandelbrot\Mandelbrot.csproj" />
+	  <ProjectReference Include="..\Fractal_Renderer\Fractal_Renderer.csproj" />
 	</ItemGroup>
 
 

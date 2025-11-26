@@ -1,5 +1,4 @@
-﻿using Mandelbrot;
-using OpenTK.Audio.OpenAL;
+﻿using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -8,10 +7,12 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Net.Http.Headers;
+using System.ComponentModel;
 using OTK = OpenTK.Windowing.GraphicsLibraryFramework;
 
 
-namespace Mandelbrot
+namespace Fractal_Renderer
 
 {
 
@@ -35,16 +36,15 @@ namespace Mandelbrot
         public float FrameTimeMs => _frameTimeMs;
 
 
-        public event Action<int, float> OnPerformanceMetricsUpdated; 
+        public event Action<string, object> OnValueLabelsUpdated; 
         public event Action<float, float> OnUpdateExtremeMetrics; 
         public event Action<double> OnZoomUpdated; 
-        public event Action<Vector3d> OnCenterUpdated;
+        public event Action<Vector3d, string> OnInputValueUpdated;
 
         int canvasWidth = 640, canvasHeight = 480;
         public string renderType = "GPU32";
         public string _fractalType = "Julia";
         private string previousRenderType = "GPU32";
-
 
         public int StartX { get; set; } = 0;
         public int StartY { get; set; } = 0;
@@ -52,7 +52,9 @@ namespace Mandelbrot
 
         public int NPower { get; set; } = 2;
         public int MIterations { get; set; } = 1500;
-        public double UTime { get; private set; }
+        private float rotationValue = 0f;
+        public float target_rotation = 0f;
+        public float julia_changeRate = 1.0f;
 
 
         public float initialSideLength = 3.4f;
@@ -74,21 +76,19 @@ namespace Mandelbrot
         public Vector2i target_Size;
 
         public bool isSelectingRectangle;
-        private bool lockPosX = false;
-        private bool lockPosY = false;
-
-        public bool allowDebugging = false;
+        public bool[] lockOrigin = new bool[2];
+        public bool[] lockCoordinate = new bool[2];
 
 
 
         public Program(NativeWindowSettings nativeWindowSettings)
           : base(GameWindowSettings.Default, nativeWindowSettings)
         {
-            mPos = new Vector2(0, 0);
             target_Location = Location;
             target_Size = Size;
             target_SideLength = initialSideLength;
             target_SideLengthPD = initialSideLengthPD;
+            target_rotation = rotationValue;
 
             _renderer = new Renderer(renderType, _fractalType);
 
@@ -117,6 +117,7 @@ namespace Mandelbrot
 
             canvasWidth = nativeWindowSettings.ClientSize.X;
             canvasHeight = nativeWindowSettings.ClientSize.Y;
+            SetInitialMouseCoordinates();
 
             nativeWindowSettings.Location = new Vector2i(StartX, StartY);
 
@@ -127,29 +128,92 @@ namespace Mandelbrot
             
         }
 
+        private void SetInitialMouseCoordinates() {
+            mPos = new Vector2(0, 0);
+            mPosPD = new Vector2d(0, 0);
+        }
 
         public void SetIterations(int iterations)
         {
             MIterations = iterations;
         }
 
-        public void SetCenterPos(char c, float val) { 
-            if (c == 'x') { currentCenter.X = val; 
-                target_Center.X = val; 
-            } else if (c == 'y') {
-                currentCenter.Y = val; 
-                target_Center.Y = val; 
-            } 
+        public void SetCenterPos(char c, object value) { 
+            switch (value)
+            {
+                case float fval:
+                    if (c == 'x')
+                    {
+                        target_Center.X = fval;
+                    }
+                    else if (c == 'y')
+                    {
+                        target_Center.Y = fval;
+                    }
+                    break;
+
+                case double dval:
+                    if (c == 'x')
+                    {
+                        target_CenterPD.X = dval;
+                    }
+                    else if (c == 'y')
+                    {
+                        target_CenterPD.Y = dval;
+                    }
+                    break;
+            }
+
+            
         }
 
-        public void SetCenterPos(char c, double val) {
-            if (c == 'x') { 
-                currentCenterPD.X = val; 
-                target_CenterPD.X = val; 
-            } else if (c == 'y') { 
-                currentCenterPD.Y = val; 
-                target_CenterPD.Y = val; 
+        public void SetCoordinatePos(char c, object value) {
+
+            switch (value) 
+            {
+                case float fval:
+                    if (c == 'x')
+                    {
+                        mPos.X = fval;
+                    }
+                    else if (c == 'y')
+                    {
+                        mPos.Y = fval;
+                    }
+                    break;
+
+                case double dval:
+                    if (c == 'x')
+                    {
+                        mPosPD.X = dval;
+                    }
+                    else if (c == 'y')
+                    {
+                        mPosPD.Y = dval;
+                    }
+                    break;
             }
+        }
+
+        public void resetFractalValues() {
+            if (renderType == "GPU32")
+            {
+                target_Center = new Vector2(0, 0);
+                target_SideLength = 3.4f;
+                target_rotation = 0f;
+                julia_changeRate = 1f;
+                MIterations = 1500;
+                SetInitialMouseCoordinates();
+            }
+            else if (renderType == "GPU64") { 
+                target_CenterPD = new Vector2d(0, 0);
+                target_SideLengthPD = 3.4d;
+                julia_changeRate = 1f;
+                MIterations = 1500;
+                SetInitialMouseCoordinates();
+            }
+            
+            MIterations = 1500;
         }
 
         public void SetColorPalette(string paletteName)
@@ -167,60 +231,105 @@ namespace Mandelbrot
             _fractalTypeQueue.Enqueue(newFractalType);
         }
 
-        private void getMousePos(Vector2 pos)
+        private void getMousePos(Vector2 pos, Vector2 mouseDelta)
         {
             if (renderType == "GPU32")
             {
-                float aspectRatio = (float)canvasWidth / canvasHeight;
+                if (julia_changeRate > 1.0001f)
+                {
+                    float baseSensitivity = 0.001f;
 
-                float normX = pos.X / canvasWidth;
-                float normY = pos.Y / canvasHeight;
+                    float sensitivity = baseSensitivity / julia_changeRate;
 
-                // Calculate view bounds
-                float halfSide = initialSideLength / 2.0f;
-                float minX = currentCenter.X - halfSide * aspectRatio;
-                float maxX = currentCenter.X + halfSide * aspectRatio;
-                float minY = currentCenter.Y - halfSide;
-                float maxY = currentCenter.Y + halfSide;
+                    // Calculate the nudge
+                    float dx = mouseDelta.X * sensitivity;
+                    float dy = mouseDelta.Y * sensitivity;
 
-                // Map to fractal coordinates
-                mPos.X = minX + normX * (maxX - minX);
-                mPos.Y = maxY - normY * (maxY - minY);
+                    // Apply to current position
+                    if (!lockCoordinate[0]) mPos.X += dx;
+                    if (!lockCoordinate[1]) mPos.Y -= dy;
+                }
+                else {
+
+                    float aspectRatio = (float)canvasWidth / canvasHeight;
+
+                    float normX = pos.X / canvasWidth; 
+                    float normY = pos.Y / canvasHeight;
+
+                    // Calculate view bounds
+                    float halfSide = 1.5f * (initialSideLength / 3.4f);
+                    float minX = currentCenter.X - halfSide * aspectRatio; 
+                    float maxX = currentCenter.X + halfSide * aspectRatio; 
+                    float minY = currentCenter.Y - halfSide; 
+                    float maxY = currentCenter.Y + halfSide; 
+
+                    // Map to fractal coordinates
+                    if (!lockCoordinate[0]) mPos.X =  minX + normX * (maxX - minX);
+                    if (!lockCoordinate[1]) mPos.Y =  maxY - normY * (maxY - minY);
+                }
+
+                OnInputValueUpdated?.Invoke(new Vector3d(mPos.X, mPos.Y, 0.0), "Coordinates");
             }
             else if (renderType == "GPU64")
             {
-                double aspectRatio = (double)canvasWidth / canvasHeight;
+                if (julia_changeRate > 1.0001f)
+                {
+                    double baseSensitivity = 0.001d;
 
-                double normX = pos.X / canvasWidth;
-                double normY = pos.Y / canvasHeight;
+                    double sensitivity = baseSensitivity / julia_changeRate;
 
-                // Calculate view bounds
-                double halfSide = initialSideLengthPD / 2.0f;
-                double minX = currentCenterPD.X - halfSide * aspectRatio;
-                double maxX = currentCenterPD.X + halfSide * aspectRatio;
-                double minY = currentCenterPD.Y - halfSide;
-                double maxY = currentCenterPD.Y + halfSide;
+                    // Calculate the nudge
+                    double dx = mouseDelta.X * sensitivity;
+                    double dy = mouseDelta.Y * sensitivity;
 
-                // Map to fractal coordinates
-                mPosPD.X = minX + normX * (maxX - minX);
-                mPosPD.Y = maxY - normY * (maxY - minY);
+                    // Apply to current position
+                    if (!lockCoordinate[0]) mPosPD.X += dx;
+                    if (!lockCoordinate[1]) mPosPD.Y -= dy;
+                }
+                else
+                {
+
+                    double aspectRatio = (float)canvasWidth / canvasHeight;
+
+                    double normX = pos.X / canvasWidth;
+                    double normY = pos.Y / canvasHeight;
+
+                    // Calculate view bounds
+                    double halfSide = 1.5f * (initialSideLength / 3.4f);
+                    double minX = currentCenterPD.X - halfSide * aspectRatio;
+                    double maxX = currentCenterPD.X + halfSide * aspectRatio;
+                    double minY = currentCenter.Y - halfSide;
+                    double maxY = currentCenter.Y + halfSide;
+
+                    // Map to fractal coordinates
+                    if (!lockCoordinate[0]) mPosPD.X = minX + normX * (maxX - minX);
+                    if (!lockCoordinate[1]) mPosPD.Y = maxY - normY * (maxY - minY);
+                }
             }
         }
 
-        public void LockMousePosition(bool lockState)
+        public void LockInputValue(string valueType, char axis, bool lockState)
         {
-            _inputHandler.lockMousePos = lockState;
-        }
-
-        public void LockCenterPos(char axis, bool lockState)
-        {
-            if (axis == 'x')
+            if (valueType == "Origin")
             {
-                lockPosX = lockState;
+                if (axis == 'x')
+                {
+                    lockOrigin[0] = lockState;
+                }
+                else if (axis == 'y')
+                {
+                    lockOrigin[1] = lockState;
+                }
             }
-            else if (axis == 'y')
-            {
-                lockPosY = lockState;
+            else if (valueType == "Coordinates") {
+                if (axis == 'x')
+                {
+                    lockCoordinate[0] = lockState;
+                }
+                else if (axis == 'y')
+                {
+                    lockCoordinate[1] = lockState;
+                }
             }
         }
 
@@ -231,26 +340,43 @@ namespace Mandelbrot
             _renderer.OnLoad();
         }
 
+        public Vector2d computeRotation(Vector2d world, bool inverse = false) {
+            float angleRad = MathHelper.DegreesToRadians((inverse == true) ? -rotationValue : rotationValue);
+            float cosAngle = MathF.Cos(angleRad);
+            float sinAngle = MathF.Sin(angleRad);
+
+            Console.WriteLine($"Rotation: {rotationValue}°, Cos: {cosAngle}, Sin: {sinAngle}");
+            double x_rot = world.X * cosAngle - world.Y * sinAngle;
+            double y_rot = world.X * sinAngle + world.Y * cosAngle;
+            Console.WriteLine($"Input: ({world.X}, {world.Y}) -> Output: ({x_rot}, {y_rot})");
+
+            return new Vector2d(x_rot, y_rot);
+        }
+
         private void HandlePan(Vector2 pixelDelta)
         {
+
             if (renderType == "GPU32")
             {
 
-                float dx = (lockPosX) ? 0 : -(pixelDelta.X / Size.X) * initialSideLength;
-                float dy = (lockPosY) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLength;
+                float dx = (lockOrigin[0]) ? 0 : -(pixelDelta.X / Size.X) * initialSideLength;
+                float dy = (lockOrigin[1]) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLength;
 
-                target_Center.X += dx;
-                target_Center.Y += dy;
+                var rotatedDelta = computeRotation(new Vector2d(dx, dy));
 
+                target_Center.X += (float)rotatedDelta.X;
+                target_Center.Y += (float)rotatedDelta.Y;
             }
             else if (renderType == "GPU64")
             {
 
-                double dx = (lockPosX) ? 0 : -(pixelDelta.X / Size.X) * initialSideLengthPD;
-                double dy = (lockPosY) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLengthPD;
+                double dx = (lockOrigin[0]) ? 0 : -(pixelDelta.X / Size.X) * initialSideLengthPD;
+                double dy = (lockOrigin[1]) ? 0 : (pixelDelta.Y / Size.Y) * initialSideLengthPD;
 
-                target_CenterPD.X += dx;
-                target_CenterPD.Y += dy;
+                var rotatedDelta = computeRotation(new Vector2d(dx, dy));
+
+                target_CenterPD.X += rotatedDelta.X;
+                target_CenterPD.Y += rotatedDelta.Y;
             }
 
         }
@@ -295,8 +421,8 @@ namespace Mandelbrot
                 float newMouseWorldY = newMaxY - mouseNormY * (newMaxY - newMinY);
 
 
-                target_Center.X += (lockPosX) ? 0 : mouseWorldX - newMouseWorldX;
-                target_Center.Y += (lockPosY) ? 0 : mouseWorldY - newMouseWorldY;
+                target_Center.X += (lockOrigin[0]) ? 0 : mouseWorldX - newMouseWorldX;
+                target_Center.Y += (lockOrigin[1]) ? 0 : mouseWorldY - newMouseWorldY;
 
             }
 
@@ -328,8 +454,9 @@ namespace Mandelbrot
                 double newMouseWorldX = newMinX + mouseNormX * (newMaxX - newMinX);
                 double newMouseWorldY = newMaxY - mouseNormY * (newMaxY - newMinY);
 
-                target_CenterPD.X += (lockPosX) ? 0 : mouseWorldX - newMouseWorldX;
-                target_CenterPD.Y += (lockPosY) ? 0 : mouseWorldY - newMouseWorldY;
+                target_CenterPD.X += (lockOrigin[0]) ? 0 : mouseWorldX - newMouseWorldX;
+                target_CenterPD.Y += (lockOrigin[1]) ? 0 : mouseWorldY - newMouseWorldY;
+
             }
 
         }
@@ -383,10 +510,11 @@ namespace Mandelbrot
 
                 _timeSinceLastFpsUpdate = 0.0;
 
-                OnPerformanceMetricsUpdated?.Invoke(_currentFps, _frameTimeMs);
+                OnValueLabelsUpdated?.Invoke("fps", _currentFps);
+                OnValueLabelsUpdated?.Invoke("frameTime", _frameTimeMs);
+                OnValueLabelsUpdated?.Invoke("mouse", julia_changeRate);
 
             }
-
 
             while (_shaderCommandQueue.TryDequeue(out string command))
             {
@@ -414,8 +542,6 @@ namespace Mandelbrot
                 _renderer.selectBegin = rectanglePosBegin;
                 _renderer.selectEnd = rectanglePosEnd;
 
-                Console.WriteLine($"Switched to {renderType} renderer.");
-                Console.WriteLine($"Previous renderer: {previousRenderType}");
                 previousRenderType = renderType;
             }
 
@@ -428,10 +554,11 @@ namespace Mandelbrot
             while (_fractalPaletteQueue.TryDequeue(out string paletteName))
             {
                 _renderer.SetPalette(paletteName);
-                Console.WriteLine($"Switched to {paletteName} palette.");
             }
-          
+
+            _renderer.rotationValue = rotationValue;
             _renderer.MIterations = MIterations;
+
             if (renderType == "GPU32")
             {
                 _renderer.Center = currentCenter;
@@ -465,14 +592,16 @@ namespace Mandelbrot
             {
                 initialSideLength = MathHelper.Lerp(initialSideLength, target_SideLength, dT2);
                 currentCenter = Vector2.Lerp(currentCenter, target_Center, dT2);
-                OnCenterUpdated?.Invoke(new Vector3d(currentCenter.X, currentCenter.Y, 0.0));
+                OnInputValueUpdated?.Invoke(new Vector3d(currentCenter.X, currentCenter.Y, 0.0), "Origin");
+                OnInputValueUpdated?.Invoke(new Vector3d(rotationValue, 0.0, 0.0), "Rotation");
                 OnZoomUpdated?.Invoke(initialSideLength);
             }
             else if (renderType == "GPU64")
             {
                 initialSideLengthPD = MathHelper.Lerp(initialSideLengthPD, target_SideLengthPD, dT2);
                 currentCenterPD = Vector2d.Lerp(currentCenterPD, target_CenterPD, dT2);
-                OnCenterUpdated?.Invoke(new Vector3d(currentCenterPD.X, currentCenterPD.Y, 0.0));
+                OnInputValueUpdated?.Invoke(new Vector3d(currentCenterPD.X, currentCenterPD.Y, 0.0), "Origin");
+                OnInputValueUpdated?.Invoke(new Vector3d(rotationValue, 0.0, 0.0), "Rotation");
                 OnZoomUpdated?.Invoke(initialSideLengthPD);
             }
             Location = target_Location;
@@ -482,6 +611,13 @@ namespace Mandelbrot
               (int)MathHelper.Lerp(Size.Y, target_Size.Y, dT1)
             );
 
+            float rotationDiff = target_rotation - rotationValue;
+            while (rotationDiff > 180f) rotationDiff -= 360f;
+            while (rotationDiff < -180f) rotationDiff += 360f;
+            rotationValue += rotationDiff * dT2;
+            rotationValue = rotationValue % 360f;
+
+            rotationValue = (rotationValue % 360f + 360f) % 360f;
 
             _inputHandler.UpdateCursor(MousePosition, Size);
         }
@@ -574,7 +710,6 @@ namespace Mandelbrot
 
             }
 
-            _renderer.Center = currentCenter;
             _renderer.Center = currentCenter;
         }
     }

@@ -10,7 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Mandelbrot
+namespace Fractal_Renderer
 
 {
 
@@ -41,6 +41,7 @@ namespace Mandelbrot
 
         public Vector2 mPos;
         public Vector2d mPosPD;
+        public float rotationValue = 0.0f;
         private float aspectRatio;
         private float halfSideLength;
         private double halfSideLengthPD;
@@ -265,6 +266,7 @@ namespace Mandelbrot
 
             _activeShader.SetFloat("N_POWER", NPower);
             _activeShader.SetFloat("MAX_ITERATIONS", MIterations);
+            _activeShader.SetFloat("rotation_angle", rotationValue);
 
             calcCoordinates();
             checkSelection(Size);
@@ -305,8 +307,6 @@ namespace Mandelbrot
             }
 
         }
-
-
 
         private void checkSelection(Vector2 Size) {
 

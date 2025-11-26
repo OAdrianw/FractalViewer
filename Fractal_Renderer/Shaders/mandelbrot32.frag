@@ -1,15 +1,17 @@
 ﻿#version 460 core
+#define pi 3.1415
 
 in vec3 vPos; 
 out vec4 FragColor;
 
-uniform double minx;
-uniform double maxx;
-uniform double miny;
-uniform double maxy;
+uniform float minx;
+uniform float maxx;
+uniform float miny;
+uniform float maxy;
 
 uniform float MAX_ITERATIONS;
 uniform float N_POWER;
+uniform float rotation_angle;
 
 uniform vec3 palette[10];
 uniform int palette_size;
@@ -19,13 +21,11 @@ uniform vec2 endRect;
 uniform float drawRectangle; // 1.0 if rectangle should be drawn, 0.0 otherwise
 uniform float u_borderWidth;
 
-
-
-float iterateMandelbrot_naive(dvec2 coord) {
-    dvec2 z = dvec2(0.0);
-    dvec2 c = coord;
+float iterateMandelbrot_naive(vec2 coord) {
+    vec2 z = vec2(0.0);
+    vec2 c = coord;
     
-    double tempZ = z.x;
+    float tempZ = z.x;
     float count = 0.0;
 
     do {
@@ -39,9 +39,9 @@ float iterateMandelbrot_naive(dvec2 coord) {
     return count;
 }
 
-float iterateMandelbrot_optimized(dvec2 p0) {
-    dvec2 p = dvec2(0.0);
-    dvec2 p2 = dvec2(0.0);
+float iterateMandelbrot_optimized(vec2 p0) {
+    vec2 p = vec2(0.0);
+    vec2 p2 = vec2(0.0);
     
     float count = 0.0;
 
@@ -56,6 +56,7 @@ float iterateMandelbrot_optimized(dvec2 p0) {
 
     return count;
 }
+
 
 
 vec4 drawSelection() {
@@ -119,15 +120,35 @@ vec4 colorFractal(float count) {
     }
 }
 
+float convertToRad(float degrees) {
+    return degrees * (pi / 180.0);
+}
+
+vec2 applyRotation(vec2 point, vec2 center, float angleDegrees) {
+
+    vec2 r;
+    float angleRad = convertToRad(angleDegrees);
+
+    vec2 t = point - center;
+    r.x = t.x * cos(angleRad) - t.y * sin(angleRad);
+    r.y = t.x * sin(angleRad) + t.y * cos(angleRad);
+    r += center;
+
+    return r;
+}
+
 void main(){
 
-    double x_interp = (vPos.x + 1.0) / 2.0; 
-    double y_interp = (vPos.y + 1.0) / 2.0; 
+    float x_interp = (vPos.x + 1.0) / 2.0; 
+    float y_interp = (vPos.y + 1.0) / 2.0; 
 
-    double x_coord  = mix(minx, maxx, x_interp);
-    double y_coord  = mix(miny, maxy, y_interp);
+    float x_coord  = mix(minx, maxx, x_interp);
+    float y_coord  = mix(miny, maxy, y_interp);
 
-    dvec2 coord = dvec2(x_coord, y_coord);
+    vec2 coord = vec2(x_coord, y_coord);
+    vec2 u_center = vec2((minx + maxx) / 2.0, (miny + maxy) / 2.0);
+    
+    coord = applyRotation(coord, u_center, rotation_angle); 
 
     float i = iterateMandelbrot_optimized(coord);
     vec4 color;
